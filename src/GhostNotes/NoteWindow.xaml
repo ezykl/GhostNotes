@@ -1,0 +1,68 @@
+<Window x:Class="GhostNotes.NoteWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ResizeMode="NoResize"
+        MinWidth="180"
+        MinHeight="120"
+        Title="GhostNote">
+    <Window.Resources>
+        <Style x:Key="Grip" TargetType="Thumb">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Rectangle Fill="Transparent"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+    <Grid>
+        <Border x:Name="Glass" CornerRadius="12" BorderBrush="#80FFFFFF" BorderThickness="1">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="16" ShadowDepth="2" Opacity="0.35"/>
+            </Border.Effect>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="26"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <Border x:Name="DragStrip" Grid.Row="0" Cursor="SizeAll" CornerRadius="12,12,0,0"
+                        MouseLeftButtonDown="OnDragStripDown"/>
+                <RichTextBox x:Name="Body" Grid.Row="1"
+                             AcceptsReturn="True"
+                             AcceptsTab="True"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Padding="8,4,8,8"
+                             HorizontalScrollBarVisibility="Hidden"
+                             VerticalScrollBarVisibility="Auto"
+                             TextChanged="OnBodyTextChanged"/>
+            </Grid>
+        </Border>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition/>
+                <ColumnDefinition Width="8"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="8"/>
+                <RowDefinition/>
+                <RowDefinition Height="8"/>
+            </Grid.RowDefinitions>
+            <Thumb Grid.Row="0" Grid.Column="0" Style="{StaticResource Grip}" Cursor="SizeNWSE" Tag="NW" DragDelta="OnResizeDelta"/>
+            <Thumb Grid.Row="0" Grid.Column="1" Style="{StaticResource Grip}" Cursor="SizeNS" Tag="N" DragDelta="OnResizeDelta"/>
+            <Thumb Grid.Row="0" Grid.Column="2" Style="{StaticResource Grip}" Cursor="SizeNESW" Tag="NE" DragDelta="OnResizeDelta"/>
+            <Thumb Grid.Row="1" Grid.Column="0" Style="{StaticResource Grip}" Cursor="SizeWE" Tag="W" DragDelta="OnResizeDelta"/>
+            <Thumb Grid.Row="1" Grid.Column="2" Style="{StaticResource Grip}" Cursor="SizeWE" Tag="E" DragDelta="OnResizeDelta"/>
+            <Thumb Grid.Row="2" Grid.Column="0" Style="{StaticResource Grip}" Cursor="SizeNESW" Tag="SW" DragDelta="OnResizeDelta"/>
+            <Thumb Grid.Row="2" Grid.Column="1" Style="{StaticResource Grip}" Cursor="SizeNS" Tag="S" DragDelta="OnResizeDelta"/>
+            <Thumb Grid.Row="2" Grid.Column="2" Style="{StaticResource Grip}" Cursor="SizeNWSE" Tag="SE" DragDelta="OnResizeDelta"/>
+        </Grid>
+    </Grid>
+</Window>
