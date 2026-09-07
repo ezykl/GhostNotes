@@ -1,7 +1,7 @@
 using System;
 using System.Windows;
 using GhostNotes.Interop;
-using GhostNotes.Models;
+using GhostNotes.Services;
 using Application = System.Windows.Application;
 
 namespace GhostNotes;
@@ -17,7 +17,11 @@ public partial class App : Application
             new ProcessWindowEnumerator(),
             gate,
             NativeMethods.GetCurrentProcessId());
-        var window = new NoteWindow(new Note(), guard);
-        window.Show();
+        var manager = new NoteManager(new NoteRepository(), guard);
+        Manager = manager;
+        manager.RestoreAll();
+        if (manager.Windows.Count == 0) manager.CreateNote();
     }
+
+    internal NoteManager? Manager { get; private set; }
 }
