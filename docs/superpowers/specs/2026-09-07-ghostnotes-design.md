@@ -73,9 +73,11 @@ Every top-level window the process shows receives, at creation:
 
 1. **Capture exclusion** — `SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE)`
 2. **Tool-window style** — `WS_EX_TOOLWINDOW` (no Alt-Tab, no taskbar)
-3. **No-activate behavior** — `WS_EX_NOACTIVATE`, so clicking a note gives
-   its text box keyboard focus without the window stealing foreground or
-   reordering above other applications
+3. **Activation** — `WS_EX_NOACTIVATE` was evaluated and rejected: it stops
+   the window from taking keyboard focus, which would break typing into the
+   note whenever another application is foreground. Notes therefore activate
+   normally on click (required for editing) and rely on
+   `WS_EX_TOOLWINDOW` alone for taskbar/Alt-Tab invisibility
 
 ### The WPF popup wrinkle
 
