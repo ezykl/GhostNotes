@@ -1,37 +1,53 @@
-# GhostNotes — Design
+# GhostNotes — Design (v2)
 
 **Date:** 2026-09-07
-**Status:** Approved in brainstorming session; pending user review
+**Status:** Approved in brainstorming (v2 revision); pending user review
 **Target:** Windows 11 (build 26200), .NET 8
+**Supersedes:** the v1 RTF/rich-text design — no implementation exists yet, so no migration.
 
 ## 1. Overview
 
-GhostNotes is a sticky-note widget app for Windows. Notes float above all
-windows on the user's physical screen, yet are **always invisible to software
-screen capture** — web-conference sharing (Teams, Zoom, Google Meet, Discord),
-recording/streaming software (OBS, Xbox Game Bar), and screenshots (Print
-Screen, Snipping Tool). Capture exclusion is a structural property of every
-window the app creates; there is no off switch and no mode to forget.
+GhostNotes is a tray-resident Markdown notes app for Windows. You compose and
+organize notes in a proper **manager window**, then deploy them as glassy,
+always-on-top **overlay** widgets. Every window the app shows — the manager,
+the overlays, and every popup/tooltip/context menu — is structurally
+invisible to software screen capture (Teams, Zoom, Meet, Discord, OBS,
+screenshots) while fully visible on the physical monitor.
 
-## 2. Goals (v1)
+## 2. Goals (v2)
 
-- Multiple independent sticky notes; tray-driven and hotkey-driven
-- Always-on-top, draggable, freely resizable notes with a glassy (frosted)
-  appearance
-- Rich text: bold, italic, underline, text color, note color
-- Responsive text: word-wrap with live reflow on resize; Ctrl+wheel font zoom
-- Persistence: notes (content, formatting, position, size, color, opacity,
-  font size) survive restarts
-- `Ctrl+Alt+N` creates a note; `Ctrl+Alt+S` shows/hides all notes **for the
-  user's own view only** — capture exclusion remains active in both states
-- No taskbar presence, no Alt-Tab entry (tool windows)
-- Single self-contained `.exe` via `dotnet publish`; personal use, no installer
+- A **manager window**: normal window (title bar, taskbar, Alt-Tab), opens on
+  launch; X hides to tray; tray reopens; tray Exit quits.
+- Notes are **Markdown documents** edited in a two-mode editor:
+  - **Edit mode** — monospace editing with a predefined Markdown command
+    toolbar (bold, italic, strikethrough, H1–H3, bullet/numbered lists, task
+    checkboxes, inline code, fenced code block, blockquote, link, horizontal
+    rule)
+  - **Preview mode** — the rendered document, toggled with `Ctrl+P`
+- **Tabs** are named deployable sets of notes. A tab strip on top; `+` add,
+  double-click rename, X close, eye marker on the deployed tab.
+- A **note sidebar** (left) listing the selected tab's notes as title cards
+  (title = first heading / first non-empty line). `+` add note; delete per
+  card.
+- **Overlays**: read-only rendered Markdown (the manager's exact renderer),
+  glassy acrylic, always-on-top, draggable, resizable; double-click opens the
+  note in the manager editor; live re-render while editing in the manager.
+- **Deployment**: exactly one tab deployed at a time. Tray menu per tab,
+  `Ctrl+Alt+S` show/hide the active tab, `Ctrl+Alt+1…9` deploy tab N,
+  `Ctrl+Alt+N` new note in the active tab. On restart nothing is deployed.
+- **Persistence**: notes as real `.md` files; tabs + overlay geometry in
+  `index.json`; atomic writes; 500ms debounced autosave.
+- **First run**: seed a "Welcome" tab with two sample notes (syntax showcase
+  + how overlays work).
+- Single self-contained `.exe`; personal use, no installer.
 
-## 3. Non-goals (v1)
+## 3. Non-goals (v2)
 
-- Installer, autostart with Windows, multi-user distribution, signing
-- Click-through mode, per-note always-on-top toggle (deferred)
-- Cloud sync, encryption, search across notes
+- Installer, autostart, multi-user distribution, signing
+- Note/tab drag-reorder, split view, search across notes
+- Markdown syntax highlighting in Edit mode, image rendering, tables
+  (parse-and-render subset only)
+- Click-through mode; per-note always-on-top toggle
 - macOS/Linux support
 
 ## 4. Threat model — what capture exclusion does and does not stop
@@ -39,188 +55,210 @@ window the app creates; there is no off switch and no mode to forget.
 The mechanism is the documented Win32 call
 `SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE)` (Windows 10 2004+,
 build 19041). The Desktop Window Manager (DWM) composites two rendering
-paths: one for the physical display, one for capture consumers (Desktop
-Duplication, Windows Graphics Capture, GDI BitBlt). A window flagged
-`WDA_EXCLUDEFROMCAPTURE` is included in the display pass and omitted from
-the capture pass. Capture software cannot override this; it receives a frame
-that never contained the window. The desktop behind the note shows through —
-no black rectangle, no visual cue for viewers.
+paths — one for the physical display, one for capture consumers (Desktop
+Duplication, Windows Graphics Capture, GDI BitBlt). A flagged window is
+included in the display pass and omitted from the capture pass. Capture
+software cannot override this; the desktop behind the window shows through —
+no black box, no cue for viewers.
 
-**Stops:**
-- Screen share in Teams, Zoom, Google Meet, Webex, Discord (any tool built on
-  standard Windows capture surfaces)
-- OBS, Xbox Game Bar, and similar recorders
-- Print Screen, Snipping Tool, programmatic BitBlt/DXGI/WGC capture
+**Stops:** screen share in Teams/Zoom/Meet/Webex/Discord; OBS, Xbox Game Bar,
+and similar recorders; Print Screen, Snipping Tool, programmatic
+BitBlt/DXGI/WGC capture — for the manager, the overlays, and their popups.
 
-**Does not stop (documented in-app):**
-- A phone, camera, or person physically viewing the monitor
-- An HDMI capture card between GPU and monitor (hardware path, pre-DWM)
-- The process appearing in Task Manager (affinity affects compositing, not
-  process enumeration)
-- The tray icon appearing when the user shares the entire screen including the
-  taskbar
-
-Microsoft's own documentation: this is a content-protection convenience, not
-DRM and not a security boundary against the local user.
+**Does not stop (documented in-app):** a phone/camera/person viewing the
+monitor; an HDMI capture card between GPU and monitor; the process appearing
+in Task Manager; the tray icon on a full-screen share. This is a
+content-protection convenience, not DRM and not a security boundary.
 
 ## 5. Architecture
 
-Single-process .NET 8 WPF application, one project, no external UI
-dependencies. No main window: the app is resident in the system tray; each
-note is an independent frameless top-level window.
+Single-process .NET 8 WPF application. Two kinds of window:
 
-Every top-level window the process shows receives, at creation:
+- **ManagerWindow** — normal (not layered) window, resizable, in taskbar and
+  Alt-Tab. Still flagged `WDA_EXCLUDEFROMCAPTURE` (its content and every
+  popup are never capturable). It is the app's home: tabs, sidebar, editor.
+- **OverlayWindow** — one per deployed note: frameless, layered, topmost,
+  read-only, `WS_EX_TOOLWINDOW` (no Alt-Tab/taskbar), flagged
+  `WDA_EXCLUDEFROMCAPTURE`.
 
-1. **Capture exclusion** — `SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE)`
-2. **Tool-window style** — `WS_EX_TOOLWINDOW` (no Alt-Tab, no taskbar)
-3. **Activation** — `WS_EX_NOACTIVATE` was evaluated and rejected: it stops
-   the window from taking keyboard focus, which would break typing into the
-   note whenever another application is foreground. Notes therefore activate
-   normally on click (required for editing) and rely on
-   `WS_EX_TOOLWINDOW` alone for taskbar/Alt-Tab invisibility
+Every top-level window the process shows is, at creation:
+1. **Capture-excluded** via `SetWindowDisplayAffinity(…, WDA_EXCLUDEFROMCAPTURE)`
+2. Overlays additionally get `WS_EX_TOOLWINDOW`
 
 ### The WPF popup wrinkle
 
-WPF tooltips, context menus, and dropdowns each spawn their own top-level
-HWND that starts capture-visible. CaptureGuard closes this gap two ways:
-
-- A `Popup.Opened` class handler applies affinity the instant any popup
-  belonging to the process appears
+Tooltips, context menus, and combo dropdowns each spawn their own top-level
+HWND that starts capture-visible. `CaptureGuard` closes the gap:
+- A `Popup.Opened` class handler applies affinity the instant any process
+  popup appears
 - A 1-second `DispatcherTimer` sweep enumerates all top-level windows of the
-  current process (`EnumWindows` + `GetWindowThreadProcessId`), applies
-  `WDA_EXCLUDEFROMCAPTURE` to any that lack it, and verifies applied state
-  with `GetWindowDisplayAffinity`
+  process (`EnumWindows`), re-asserts affinity on any that lack it, and
+  verifies state with `GetWindowDisplayAffinity`
 
-The periodic sweep also heals cases where Windows silently resets affinity
-after certain window events. Affinity application failure is never silent:
-the tray tooltip reflects live protection status.
+Affinity failure is never silent: the tray tooltip reports live status.
 
-### Windows version gate
+### Version gate
 
-`WDA_EXCLUDEFROMCAPTURE` requires build ≥ 19041. On older builds it silently
-degrades to `WDA_MONITOR` (black box in captures). The app checks
-`Environment.OSVersion` at startup; below 19041 it uses `WDA_MONITOR` and
-notifies the user. (Dev machine: Windows 11 Pro build 26200 — unaffected.)
+Below build 19041, `WDA_EXCLUDEFROMCAPTURE` degrades to `WDA_MONITOR` (black
+box). The app gates on `Environment.OSVersion` and notifies via balloon.
+(Dev machine: build 26200.)
 
 ## 6. Components
 
-| Unit | Purpose | Key dependencies |
+| Unit | Purpose | Dependencies |
 |---|---|---|
-| `App` / `TrayController` | Startup, single-instance mutex, tray icon + menu (New Note, Show/Hide All, Exit), protection-status tooltip | `NoteManager`, `HotkeyService`, WinForms `NotifyIcon` |
-| `NoteManager` | Creates/restores/deletes note windows; owns the collection; services show/hide-all | `NoteWindow`, `NoteRepository` |
-| `NoteWindow` | One frameless note: glassy visual, drag header, 8-direction resize grips, rich-text toolbar, context menu | `NativeMethods`, `CaptureGuard` |
-| `NativeMethods` | P/Invoke surface: `SetWindowDisplayAffinity`, `GetWindowDisplayAffinity`, `RegisterHotKey`/`UnregisterHotKey`, `SetWindowLong`, `EnumWindows`, `SetWindowCompositionAttribute` | — |
-| `CaptureGuard` | Popup handler + 1s sweep + status reporting (raises `ProtectionStatusChanged`) | `NativeMethods` |
-| `HotkeyService` | Registers `Ctrl+Alt+N` / `Ctrl+Alt+S`; on conflict falls back to `Ctrl+Alt+Shift+N/S` with tray balloon notice; routes to `NoteManager` | `NativeMethods` |
-| `NoteRepository` | Load/save one JSON file per note in `%APPDATA%\GhostNotes\notes\`; 500ms debounced autosave; corrupt-file recovery | `Models.Note` |
-| `Models.Note` | Serializable note state: id, RTF payload, position, size, tint color, opacity, font size, timestamps | — |
+| `App` / `TrayController` | Startup, single-instance, tray icon + menu (Open Manager, per-tab deploy, Show/Hide, New Note, Exit), protection-status tooltip, balloon notices | `NoteManager`, `HotkeyService`, `CaptureGuard`, `TabDeploymentController` |
+| `NoteManager` | Facade: creates manager/overlay windows, wires editing → autosave → overlay re-render, deploy/hide, delete | `Store`, `TabDeploymentController`, `ManagerWindow`, `OverlayWindow`, `AutosaveScheduler` |
+| `TabDeploymentController` | Pure deploy-state machine: exactly one deployed tab; `Deploy(tab)`, `Toggle()`, `HideAll()`, events | `Models` |
+| `ManagerWindow` | Tab strip, note sidebar, Edit/Preview editor, note settings | `MarkdownRenderer`, `MarkdownCommands`, `Store` |
+| `OverlayWindow` | Read-only rendered note; glassy, draggable, resizable; double-click → edit in manager | `MarkdownRenderer` |
+| `MarkdownRenderer` | Markdig → FlowDocument (shared by preview and overlays) | Markdig |
+| `MarkdownCommands` | Pure text transforms for the toolbar (wrap/insert at caret) | — |
+| `Store` | Load/save `.md` files + `index.json`; atomic writes; corrupt recovery | `Models` |
+| `HotkeyService` / `HotkeySelection` | Register/route global hotkeys; fallback selection | `NativeMethods` |
+| `CaptureGuard` | Popup handler + sweep + status events | `NativeMethods` |
+| `AutosaveScheduler` | Debounced save (500ms) | — |
+| `SingleInstanceGuard` | Mutex + "open manager" signal to first instance | — |
+| `NativeMethods` / `VersionGate` | P/Invoke surface + build gate | — |
+| `Clamp` (`PositionClamp`, `FontZoom`) | Off-screen clamp + font clamp (8–48) | — |
 
 ## 7. UX specification
 
-### Appearance (glassy overlay)
+### Manager window
 
-- Frameless (`WindowStyle=None`, `AllowsTransparency=True`, `Topmost=True`)
-- Rounded corners ~12px, thin luminous border, soft drop shadow
-- **Frosted acrylic blur-behind** via `SetWindowCompositionAttribute` with
-  `ACCENT_ENABLE_ACRYLICBLURBEHIND`, tinted with the note's color; if the
-  call fails, graceful fallback to plain semi-transparency (gradient tint at
-  the note's opacity) — the note always renders
-- Per-note tint color (default yellow); per-note opacity slider
-  (context menu), default 85%
+- **Chrome:** standard window; X hides to tray (app keeps running).
+- **Tab strip (top):** tabs in order; `+` adds "New Tab"; double-click
+  renames inline; X closes (deletes tab + its notes); the deployed tab shows
+  an eye marker.
+- **Note sidebar (left):** the selected tab's notes as title cards; title
+  derived from the first `#` heading, else the first non-empty line, else
+  "(untitled)"; `+` adds a note; a per-card delete.
+- **Editor (main):** Edit mode is a monospace, non-wrapping text box with the
+  command toolbar above it. Preview mode renders via `MarkdownRenderer` into
+  a read-only `FlowDocumentScrollViewer`. `Ctrl+P` toggles.
+- **Note settings (right of editor or in a per-note header):** tint color,
+  opacity, font size, delete note. These affect the overlay appearance.
+- **Command toolbar (Edit mode):**
+  - Bold `Ctrl+B` → `**…**`, Italic `Ctrl+I` → `*…*`, Strikethrough → `~~…~~`
+  - H1/H2/H3 → prefix lines `#`/`##`/`###`
+  - Bullet list `- `, Numbered list `1. `, Task checkbox `- [ ]`
+  - Inline code `` `…` ``, Code block ````` ``` `````` ```` ````` ``````, Blockquote `> `
+  - Link `[text](url)`, Horizontal rule `---`
+  - Commands wrap the current selection or insert at the caret.
 
-### Sizing and text
+### Overlay windows
 
-- 8-direction resize grips (edges + corners) via custom `Thumb` elements;
-  minimum size 180×120; size and position persist
-- Text always word-wraps and reflows live during resize (no horizontal
-  scrolling, no clipping)
-- Ctrl+mouse wheel inside a note changes font size (range 8–48); persisted
-  per note
-- Toolbar: bold / italic / underline / text color / note color
+- Read-only rendered note in a glassy frame: rounded (~12px), acrylic
+  blur-behind (tinted with the note color), luminous edge, shadow; plain
+  translucency fallback if acrylic fails.
+- Always-on-top; drag anywhere; 8-direction resize grips (min 180×120).
+- Double-click → the note opens in the manager editor (manager surfaces if
+  hidden). Context menu: Delete Note, tint, opacity, font size.
+- Geometry (position/size), tint, opacity, font size persist per note.
 
-### Interaction
+### Deployment semantics
 
-- Drag anywhere on the note header strip; note body edits text
-- Context menu: New Note, Delete Note, Note Color, Opacity, Font Size,
-  Exit
-- Tray menu: New Note, Show/Hide All, Exit; tooltip shows note count and
-  protection status ("Capture protection: ON")
+- One tab deployed at a time; `Deploy(B)` hides A's overlays and shows B's.
+- `Ctrl+Alt+S` toggles the active tab's overlays (show/hide — hide also
+  resets deployment to "none").
+- `Ctrl+Alt+1…9` deploys the Nth tab by order (ignored if N > tab count).
+- Tray lists tabs with a checkmark on the deployed one; clicking toggles.
 
 ### Hotkeys
 
 | Combo | Action |
 |---|---|
-| `Ctrl+Alt+N` | New note (cascaded: each new note offset 24px from the previous) |
-| `Ctrl+Alt+S` | Show/Hide all notes — user's own view only |
+| `Ctrl+Alt+N` | New note in the active tab (opens in manager editor) |
+| `Ctrl+Alt+S` | Show/hide the active tab's overlays |
+| `Ctrl+Alt+1…9` | Deploy tab N |
+| `Ctrl+P` | Toggle Edit/Preview (in manager only) |
 
-Show/hide semantics: hiding sets `Visibility=Hidden` on every note (a hidden
-window is uncapturable by definition); showing re-applies
-`WDA_EXCLUDEFROMCAPTURE` **before** setting `Visibility=Visible`, so there is
-no capture gap on reveal.
+Conflicts fall back to `Ctrl+Alt+Shift+…` with a balloon notice.
 
-## 8. Data & persistence
+## 8. Data model & persistence
 
-One JSON file per note: `%APPDATA%\GhostNotes\notes\{id}.json`
+- `%APPDATA%\GhostNotes\notes\{id}.md` — the Markdown content, plain UTF-8,
+  editable outside the app.
+- `%APPDATA%\GhostNotes\index.json`:
 
 ```json
 {
-  "id": "guid",
-  "rtf": "{\\rtf1...}",
-  "x": 120, "y": 240,
-  "width": 320, "height": 220,
-  "tint": "#FFF59D",
-  "opacity": 0.85,
-  "fontSize": 14,
-  "createdAt": "2026-09-07T10:00:00Z",
-  "updatedAt": "2026-09-07T10:05:00Z"
+  "version": 1,
+  "activeTabId": "guid",
+  "tabs": [
+    {
+      "id": "guid",
+      "name": "Standup",
+      "notes": [
+        {
+          "id": "guid",
+          "x": 120, "y": 240, "width": 320, "height": 220,
+          "tint": "#FFF59D", "opacity": 0.85, "fontSize": 14,
+          "createdAt": "2026-09-07T10:00:00Z",
+          "updatedAt": "2026-09-07T10:05:00Z"
+        }
+      ]
+    }
+  ]
 }
 ```
 
-- Autosave: text edit, move, resize, color/opacity/font change → 500ms
-  debounce → write file
-- Save-all on app exit and on Windows session end (`SessionEnding`)
-- Storing RTF preserves rich-text formatting across restarts
+- Note title is **derived**, not stored (first `#` heading → first line →
+  "(untitled)"), so titles never drift from content.
+- Order = array position; v2 has no drag-reorder.
+- Atomic writes: write temp file then `File.Replace`; index rewritten on any
+  change (debounced 500ms).
+- Corrupt `index.json` → renamed `.bad`, then rebuilt from the `.md` files
+  into a "Recovered" tab (content is never lost — it lives in the files).
+- Missing `.md` for a known note → treated as empty content, metadata kept.
 
 ## 9. Error handling
 
 | Failure | Behavior |
 |---|---|
-| Affinity call fails or is reset | CaptureGuard retries next sweep; tray tooltip shows "protection: OFF" until verified back on |
-| Hotkey combo owned by another app | Automatic fallback to `Ctrl+Alt+Shift+N/S` + tray balloon notice |
-| Corrupt/unreadable note JSON | Rename to `{id}.json.bad` (backup), skip it, load remaining notes |
-| Second app launch | Single-instance mutex; the new process exits and signals the existing instance to surface |
+| Affinity call fails or is reset | CaptureGuard retries next sweep; tray tooltip shows "protection: OFF" |
+| Hotkey combo owned by another app | Shift-variant fallback + balloon notice |
+| Corrupt `index.json` | `.bad` backup + rebuild from `.md` files into "Recovered" tab |
+| Missing `.md` file | Note loads with empty content, metadata preserved |
+| Second app launch | Exits immediately and signals the first instance to open its manager |
 | Windows build < 19041 | `WDA_MONITOR` fallback + balloon warning |
-| Acrylic blur unsupported/fails | Plain semi-transparency fallback; appearance degrades, function does not |
-| Note position off-screen (display layout changed) | Clamp back onto the nearest visible monitor at startup |
+| Acrylic unsupported/fails | Plain semi-transparency fallback |
+| Note geometry off-screen (display changed) | Clamped onto the nearest visible monitor at startup |
 
 ## 10. Testing strategy
 
-### Unit tests (xUnit, `tests/GhostNotes.Tests`)
+### Unit tests (xUnit)
 
-- `NoteRepository`: save/load round-trip including RTF payload; corrupt-file
-  rename-and-skip; debounce flush timing
-- Hotkey fallback selection logic
-- Off-screen position clamping logic
-- JSON schema stability (fields survive save/load unchanged)
+- `Store`: index round-trip; corrupt-index recovery + rebuild; missing-.md
+  handling; atomic write leaves no partial file; note create/delete/rename.
+- `TabDeploymentController`: deploy exclusivity (deploying B hides A), toggle,
+  hide-all, deploy-by-index bounds.
+- `MarkdownCommands`: bold/italic/strike wrap selection; wrap empty selection
+  (inserts placeholder); header/list/code/quote/link/hr transforms.
+- `MarkdownRenderer` (Markdig→FlowDocument): a heading produces a large bold
+  paragraph; `**x**` produces a Bold run; a fenced code block produces a
+  monospace tinted paragraph; `- ` produces a List; `> ` produces an indented
+  quote.
+- Carried over: `PositionClamp`/`FontZoom`, `HotkeySelection`,
+  `CaptureGuard` (fakes), `SingleInstanceGuard`, `AutosaveScheduler`.
 
-The Win32 interop surface (`NativeMethods`, `CaptureGuard`) requires a real
-desktop and is covered by the manual checklist below; interop wrappers are
-kept thin so logic above them is unit-testable.
+Desktop-bound code (ManagerWindow/OverlayWindow/Tray/App wiring) is covered by
+the manual checklist.
 
-### Manual verification checklist (run on target machine, once per release)
+### Manual verification checklist (per release)
 
-1. OBS preview open → note absent; desktop behind it shows through
-2. Teams/Zoom share viewed from a second device (phone) → note absent
-3. Snipping Tool and Print Screen → note absent from screenshots
-4. Physical monitor → note visible and fully interactive
-5. Alt-Tab → no GhostNotes entry; taskbar → no entry; Task Manager → process
-   listed (expected)
-6. Right-click a note while OBS records → context menu also invisible in
-   recording
-7. `Ctrl+Alt+S` → all notes hide instantly; press again → notes return;
-   capture exclusion verified still on (checklist item 1 again)
-8. Terminate the app abruptly mid-edit (`taskkill /IM GhostNotes.exe /F`)
-   → restart → notes restored from last autosave
+1. OBS preview open → manager window absent; desktop shows through
+2. Teams/Zoom share viewed from a second device → manager AND overlays absent
+3. Snipping Tool + Print Screen → absent
+4. Physical monitor → manager and overlays visible and interactive
+5. Alt-Tab/taskbar → overlays absent; manager present (by design)
+6. Right-click / open combos in the manager while OBS records → popups absent
+7. Deploy tab via tray and `Ctrl+Alt+1…9`; `Ctrl+Alt+S` hide/return — overlays
+   never appear in OBS
+8. Edit a deployed note in the manager → overlay re-renders live; OBS clean
+9. `taskkill /IM GhostNotes.exe /F` mid-edit → restart restores last ~0.5s of
+   edits and all notes/tabs
+10. Second launch → first instance's manager surfaces
 
 ## 11. Project structure
 
@@ -229,29 +267,30 @@ kept thin so logic above them is unit-testable.
   docs/superpowers/specs/2026-09-07-ghostnotes-design.md   (this file)
   .gitignore
   src/GhostNotes/
-    GhostNotes.csproj          (net8.0-windows, UseWPF + UseWindowsForms for NotifyIcon)
-    App.xaml / App.xaml.cs     (startup, single-instance, session-end save)
+    GhostNotes.csproj               (net8.0-windows, UseWPF + UseWindowsForms, Markdig)
+    App.xaml / App.xaml.cs
+    ManagerWindow.xaml / .cs
+    OverlayWindow.xaml / .cs
     TrayController.cs
     NoteManager.cs
-    NoteWindow.xaml / NoteWindow.xaml.cs
-    Interop/NativeMethods.cs
-    Interop/CaptureGuard.cs
-    Services/HotkeyService.cs
-    Services/NoteRepository.cs
-    Models/Note.cs
+    TabDeploymentController.cs
+    Models/  (Tab.cs, Note.cs, Index.cs)
+    Services/ (Store.cs, MarkdownRenderer.cs, MarkdownCommands.cs,
+               AutosaveScheduler.cs, HotkeyService.cs, HotkeySelection.cs,
+               SingleInstanceGuard.cs, Clamp.cs)
+    Interop/ (NativeMethods.cs, VersionGate.cs, CaptureGuard.cs)
   tests/GhostNotes.Tests/
-    GhostNotes.Tests.csproj
-    NoteRepositoryTests.cs
-    HotkeyServiceTests.cs
-    PositionClampingTests.cs
+    GhostNotes.Tests.csproj          (xunit + Markdig)
+    StoreTests.cs, TabDeploymentTests.cs, MarkdownCommandsTests.cs,
+    RendererTests.cs, ClampTests.cs, HotkeySelectionTests.cs,
+    CaptureGuardTests.cs, SingleInstanceGuardTests.cs, AutosaveSchedulerTests.cs
 ```
 
-Publish: `dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true`
-→ single `.exe`, personal use.
+Publish: `dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish`.
 
 ## 12. Future work (explicitly deferred)
 
+- Drag-reorder of tabs/notes, split Edit+Preview view, search, tags, export
+- Syntax highlighting in Edit mode, image rendering, tables
 - Click-through mode; per-note always-on-top toggle
-- Installer, autostart, portable-mode settings file
-- Note search, tags, export
-- Optional: hide tray icon (hotkey-only operation)
+- Installer, autostart, portable-mode settings
