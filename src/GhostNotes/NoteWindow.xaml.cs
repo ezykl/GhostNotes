@@ -12,9 +12,13 @@ using System.Windows.Media;
 using GhostNotes.Interop;
 using GhostNotes.Models;
 using GhostNotes.Services;
+using Brush = System.Windows.Media.Brush;
 using Color = System.Windows.Media.Color;
 using ColorConverter = System.Windows.Media.ColorConverter;
+using ContextMenu = System.Windows.Controls.ContextMenu;
 using DataFormats = System.Windows.DataFormats;
+using MenuItem = System.Windows.Controls.MenuItem;
+using Orientation = System.Windows.Controls.Orientation;
 
 namespace GhostNotes;
 
@@ -28,10 +32,8 @@ public partial class NoteWindow : Window
 
     public event EventHandler? ModelChanged;
     public event EventHandler? GeometryChanged;
-#pragma warning disable CS0067
     public event EventHandler? DeleteRequested;
     public event EventHandler? NewNoteRequested;
-#pragma warning restore CS0067
 
     public NoteWindow(Note note, CaptureGuard guard)
     {
@@ -49,6 +51,8 @@ public partial class NoteWindow : Window
         SizeChanged += (_, _) => SyncGeometry();
         SourceInitialized += OnSourceInitialized;
         PreviewMouseWheel += OnPreviewMouseWheel;
+        ContextMenu = BuildContextMenu();
+        Body.ContextMenu = null;
     }
 
     private void OnSourceInitialized(object? sender, EventArgs e)
@@ -199,5 +203,89 @@ public partial class NoteWindow : Window
         using var ms = new MemoryStream();
         range.Save(ms, DataFormats.Rtf);
         return Encoding.Default.GetString(ms.ToArray());
+    }
+
+    private void OnToggleBold(object sender, RoutedEventArgs e) =>
+        EditingCommands.ToggleBold.Execute(null, Body);
+
+    private void OnToggleItalic(object sender, RoutedEventArgs e) =>
+        EditingCommands.ToggleItalic.Execute(null, Body);
+
+    private void OnToggleUnderline(object sender, RoutedEventArgs e) =>
+        EditingCommands.ToggleUnderline.Execute(null, Body);
+
+    private void OnTextColorSelected(object sender, SelectionChangedEventArgs e)
+    {
+        if (TextColors.SelectedItem is ComboBoxItem item && item.Tag is string hex)
+        {
+            Body.Selection.ApplyPropertyValue(TextElement.ForegroundProperty, BrushFrom(hex));
+            Model.Rtf = SaveRtf();
+            ModelChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private void OnTintSelected(object sender, SelectionChangedEventArgs e)
+    {
+        if (Tints.SelectedItem is ComboBoxItem item && item.Tag is string hex)
+        {
+            Model.Tint = hex;
+            ApplyGlassBackground();
+            RefreshAcrylic();
+            ModelChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private void RefreshAcrylic()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd != IntPtr.Zero) TryAcrylic(hwnd);
+    }
+
+    private static Brush BrushFrom(string hex)
+    {
+        var color = (Color)ColorConverter.ConvertFromString(hex);
+        var brush = new SolidColorBrush(color);
+        brush.Freeze();
+        return brush;
+    }
+
+    private ContextMenu BuildContextMenu()
+    {
+        var menu = new ContextMenu();
+
+        var newNote = new MenuItem { Header = "New Note" };
+        newNote.Click += (_, _) => NewNoteRequested?.Invoke(this, EventArgs.Empty);
+        menu.Items.Add(newNote);
+
+        var delete = new MenuItem { Header = "Delete Note" };
+        delete.Click += (_, _) => DeleteRequested?.Invoke(this, EventArgs.Empty);
+        menu.Items.Add(delete);
+
+        var opacityItem = new MenuItem { StaysOpenOnClick = true };
+        var panel = new StackPanel { Orientation = Orientation.Horizontal };
+        panel.Children.Add(new TextBlock { Text = "Opacity  ", VerticalAlignment = VerticalAlignment.Center });
+        var slider = new Slider { MinWidth = 120, Minimum = 0.3, Maximum = 1.0, Value = Model.Opacity };
+        slider.ValueChanged += (_, e2) =>
+        {
+            Model.Opacity = Math.Round(e2.NewValue, 2);
+            ApplyGlassBackground();
+            ModelChanged?.Invoke(this, EventArgs.Empty);
+        };
+        panel.Children.Add(slider);
+        opacityItem.Header = panel;
+        menu.Items.Add(opacityItem);
+
+        var resetFont = new MenuItem { Header = "Reset Font Size" };
+        resetFont.Click += (_, _) =>
+        {
+            Body.FontSize = 14;
+            Model.FontSize = 14;
+            Body.Selection.ApplyPropertyValue(TextElement.FontSizeProperty, 14.0);
+            Model.Rtf = SaveRtf();
+            ModelChanged?.Invoke(this, EventArgs.Empty);
+        };
+        menu.Items.Add(resetFont);
+
+        return menu;
     }
 }
