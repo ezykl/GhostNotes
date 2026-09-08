@@ -1,122 +1,83 @@
-﻿<div align=center>
+<div align="center">
 
-<img src=GhostNotes.svg width=100 height=100 alt=GhostNotes Logo />
+<img src="GhostNotes.svg" width="96" height="96" alt="GhostNotes Logo" />
 
 # GhostNotes
 
 **Ultra-lightweight, OBS-invisible floating sticky notes for Windows 10 & 11.**
 
-Keep private stream notes, meeting prompts, talking points, checklists, and scratchpads on your screen during live broadcasts, video calls, or screen recordings — without your audience ever seeing them.
+Keep private stream notes, meeting prompts, checklists, and scratchpads on your screen during live broadcasts, video calls, or screen recordings — without your audience ever seeing them.
 
-[![Latest Release](https://img.shields.io/github/v/release/ezykl/GhostNotes?color=0078D6&style=flat-square)](https://github.com/ezykl/GhostNotes/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6?style=flat-square)](https://github.com/ezykl/GhostNotes/releases)
-[![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square)](https://dotnet.microsoft.com/)
+[![Release](https://img.shields.io/badge/release-v1.0.0-0078D6?style=flat-square)](https://github.com/ezykl/GhostNotes/releases)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
+
+<br />
+
+### [⬇️ Download GhostNotes (v1.0.0)](https://github.com/ezykl/GhostNotes/releases)
+
+*No installation or .NET runtime needed. Just download and run.*
 
 </div>
 
 ---
 
-## 🚀 Download & Quick Start
-
-> 💡 **Zero Setup Required:** You do **NOT** need to clone this repository, install .NET, or use developer tools. The downloads below are 100% self-contained — download and run immediately on any Windows 10 or 11 PC!
-
-Download the latest release from the **[Releases Page](https://github.com/ezykl/GhostNotes/releases)**:
-
-| Distribution | Type | How to Use |
-| :--- | :--- | :--- |
-| **[GhostNotes-Portable.exe](https://github.com/ezykl/GhostNotes/releases/latest)** | **Portable (Recommended)** | Single file, no installation needed. Download, place it anywhere, and double-click to run! |
-| **[GhostNotes-Setup.exe](https://github.com/ezykl/GhostNotes/releases/latest)** | **Installer** | Standard Windows setup wizard with Start Menu entry, optional desktop shortcut, and uninstaller. |
-
-*Compatible with Windows 10 (Build 2004+) and Windows 11.*
-
----
-
 ## ✨ Features
 
-### 🛡️ 100% Invisible to Screen Captures (OBS Stealth)
-GhostNotes leverages Windows Desktop Window Manager (DWM) hardware display affinity (WDA_EXCLUDEFROMCAPTURE):
-- **Invisible to Software Capture**: OBS Studio, Streamlabs, Discord screen share, Zoom, Microsoft Teams, Google Meet, Xbox Game Bar, and Snipping Tool / Print Screen cannot see your notes.
-- **Physical Monitor Only**: Notes remain completely sharp, readable, and editable on your physical screens.
-- **Background Guard**: Continuous audit sweep ensures all popups, menus, and flyouts stay strictly excluded from capture.
-
-### 📝 Pure Floating Sticky Notes
-- **Direct In-Place Editing**: Click into any note and start typing immediately.
-- **Bottom Hover Toolbar**: Invisible while typing; hover near the bottom edge to reveal a sleek formatting capsule:
-  - **Formatting**: Bold (Ctrl+B), Italic (Ctrl+I), Underline (Ctrl+U), Strikethrough
-  - **Structure**: Bullet lists, Numbered lists, Task checkboxes (- [ ]), and Inline code (` code `)
-- **Fast Autosave**: Every keystroke is safely persisted to %APPDATA%\GhostNotes\notes with debounced background writing.
-- **Smooth Rounded Corners**: Pure hardware-accelerated WPF transparency with zero sharp glassy edges or shadow clipping.
-
-### 📌 Half-Pill Docking Drawer
-- **Discreet Edge Peek**: Click **Minus (—)** in any note header to collapse it into a sleek edge pill that auto-docks against the edge of your active monitor.
-- **Hover-to-Slide**: Only a subtle 75px peek tab remains visible on screen. Hovering your mouse slides the full pill out; moving away tucks it back in.
-- **Last-Position Memory**: Clicking the pill immediately expands the sticky note right back to where you had it on your screen.
-
-### 🎨 Customization & Theme Control
-Click the **Gear (⚙)** icon in any note header to customize:
-- **Color Tints**: Curated pastel glass finishes (Yellow, Sky Blue, Mint Green, Pastel Pink, Lavender, White).
-- **Adaptive Logo Glow**: The signature ghost header icon dynamically tints its outline and glow to match the active note color.
-- **Font Colors**: High-contrast selections (Charcoal, White, Crimson, Ocean Blue, Emerald, Royal Purple).
-- **Glass Opacity Slider**: Smoothly adjust transparency from 20% to 100%.
-- **Typography Sizing**: Adjust font size on the fly (10pt to 24pt).
-- **Modern Scrollbar**: Minimalist 6px rounded capsule scrollbar replacing clunky default Windows scrollbars.
-
-### ⌨️ Global Hotkeys & Tray Controller
-- Lives conveniently in your system notification tray with live OBS status indication.
-- **Ctrl + Alt + N**: Create a new note from anywhere.
-- **Ctrl + Alt + S**: Toggle visibility of all notes instantly (your view only).
-- **Active & Closed Notes Submenus**: Easily focus or restore any open or closed notes.
-- **Start with Windows**: 1-click toggle to automatically launch GhostNotes on Windows startup.
+- **🛡️ 100% Screen-Capture Invisible (OBS Stealth)**  
+  Uses Windows DWM Hardware Capture Exclusion (`WDA_EXCLUDEFROMCAPTURE`). Notes remain crystal-clear on your physical monitor, but are completely hidden from OBS Studio, Streamlabs, Discord screen share, Zoom, Google Meet, Microsoft Teams, and screenshot tools.
+- **📌 Collapsible Edge Pill**  
+  Click the **—** button on any note to collapse it into a discreet edge pill docked against your monitor border. Hovering expands a preview; clicking restores the note to its exact previous position.
+- **✍️ In-Place Rich Text Editing**  
+  Click anywhere and type. Hover near the bottom edge of any note to reveal the formatting capsule: Bold, Italic, Underline, Strikethrough, Bullet lists, Numbered lists, and Checkboxes (`- [ ]`).
+- **🎨 Pastel Colors & Glass Opacity**  
+  Click the gear **⚙** button to choose from 6 soft pastel tints, high-contrast font colors, and smooth transparency control (20% to 100%).
+- **💾 Automatic Instant Autosave**  
+  Every keystroke and position change is safely autosaved to `%APPDATA%\GhostNotes\notes` in the background.
+- **🔔 System Tray & Windows Startup**  
+  Manage active/closed notes, monitor capture status, and toggle "Start with Windows" directly from the system tray icon.
 
 ---
 
-## ⌨️ Keyboard Shortcuts
+## ⌨️ Shortcuts
 
 | Shortcut | Context | Action |
 | :--- | :--- | :--- |
-| Ctrl + Alt + N | Global | Create a new note anywhere |
-| Ctrl + Alt + S | Global | Toggle visibility of all notes |
-| Ctrl + B | Editor | Toggle **Bold** |
-| Ctrl + I | Editor | Toggle *Italic* |
-| Ctrl + U | Editor | Toggle <u>Underline</u> |
-| Ctrl + N | Editor | Create a new note |
-| Drag Header | Note Window | Move note across displays |
-| Drag Edges / Corners | Note Window | 8-directional smooth resize |
+| **`Ctrl + Alt + N`** | Global | Create a new sticky note from anywhere |
+| **`Ctrl + Alt + S`** | Global | Hide / reveal all notes instantly |
+| **`Ctrl + B`** / **`I`** / **`U`** | Editor | Bold / Italic / Underline |
+| **`Ctrl + N`** | Editor | Create a new note |
+| **Drag Header** | Window | Reposition note anywhere (including across multi-monitor setups) |
+| **Drag Borders** | Window | Resize smoothly in any direction |
 
 ---
 
-## 🛠️ Building from Source (Developers Only)
+## 🚀 How to Run
 
-Developers who wish to contribute or modify the code can build from source:
+1. Go to **[Releases](https://github.com/ezykl/GhostNotes/releases)**.
+2. Download **`GhostNotes.exe`** (Portable single file) or **`GhostNotes-Setup.exe`** (Installer).
+3. Double-click to launch!
 
-`powershell
+> **Note:** Zero dependencies required. The portable app is completely self-contained and does not require .NET, Visual Studio, or administrative privileges to run.
+
+---
+
+## 🛠️ Building from Source (Developers)
+
+```powershell
 # Clone the repository
 git clone https://github.com/ezykl/GhostNotes.git
 cd GhostNotes
 
-# Run unit tests
-dotnet test tests/GhostNotes.Tests
-
-# Run the app locally
+# Run directly
 dotnet run --project src/GhostNotes
 
-# Publish standalone portable executable
+# Publish single-file portable executable
 dotnet publish src/GhostNotes/GhostNotes.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish
-`
-
----
-
-## 🔒 Privacy & Honest Limits
-
-GhostNotes relies on Microsoft-documented Windows APIs (SetWindowDisplayAffinity) designed for digital rights and confidential content display. Please keep the following inherent limitations in mind:
-
-- **Hardware Capture Cards**: External HDMI/DisplayPort capture devices (e.g. Elgato Cam Link, capture PCIe cards) tap directly into GPU output signals and will display notes.
-- **Physical Monitors**: Anyone physically looking at your display or pointing a mobile camera at your screen will see your notes.
-- **System Tray Icon**: If you share your entire desktop screen including the Windows taskbar, the small GhostNotes ghost icon in your tray will be visible unless placed inside the overflow chevron.
+```
 
 ---
 
 ## 📄 License
 
-Distributed under the MIT License. See LICENSE for details.
+Distributed under the [MIT License](LICENSE).

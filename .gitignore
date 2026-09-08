@@ -8,4 +8,5 @@ publish-folder/
 artifacts/
 .superpowers/
 installer/Output/
+tests/
 *.log

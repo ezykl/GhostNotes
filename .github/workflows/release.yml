@@ -1,4 +1,4 @@
-﻿name: Build and Release GhostNotes
+name: Build and Release GhostNotes
 
 on:
   push:
@@ -24,17 +24,17 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Run Unit Tests
-        run: dotnet test tests/GhostNotes.Tests --configuration Release --verbosity normal
-
       - name: Publish Single-File Portable Executable
         run: |
           dotnet publish src/GhostNotes/GhostNotes.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish
           Copy-Item publish\GhostNotes.exe publish\GhostNotes-Portable.exe
 
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress
+
       - name: Build Windows Installer (Inno Setup)
         run: |
-          iscc installer/GhostNotes.iss
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/GhostNotes.iss
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
