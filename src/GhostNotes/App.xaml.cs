@@ -5,10 +5,8 @@ using System.Windows;
 using System.Windows.Controls.Primitives;
 using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using GhostNotes.Interop;
 using GhostNotes.Services;
-using GhostNotes.Views;
 using Application = System.Windows.Application;
 using ContextMenu = System.Windows.Controls.ContextMenu;
 using ToolTip = System.Windows.Controls.ToolTip;
@@ -19,7 +17,6 @@ public partial class App : Application
 {
     private SingleInstanceGuard? _instanceGuard;
     private NoteManager? _manager;
-    private ManagerWindow? _managerWindow;
     private TrayController? _tray;
     private HotkeyService? _hotkeys;
     private CaptureGuard? _captureGuard;
@@ -63,12 +60,12 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        Log("OnStartup started");
+        Log("OnStartup started (Pure Floating Notes Architecture)");
 
         _instanceGuard = new SingleInstanceGuard(SingleInstanceGuard.DefaultMutexName);
         if (!_instanceGuard.IsFirst)
         {
-            Log("Not first instance -> signaling and shutting down");
+            Log("Not first instance -> signaling first instance and exiting");
             SingleInstanceGuard.SignalFirstInstance();
             Shutdown();
             return;
@@ -84,41 +81,17 @@ public partial class App : Application
 
         _manager = new NoteManager(new NoteRepository(), _captureGuard);
         _manager.RestoreAll();
-        if (_manager.Notes.Count == 0)
-        {
-            _manager.CreateNote();
-        }
-
-        // Initialize v2 Manager Window
-        _managerWindow = new ManagerWindow(_manager, _captureGuard);
-        TrySetWindowIcon(_managerWindow);
-
-        _manager.OpenManagerForNoteRequested += (_, note) =>
-        {
-            Dispatcher.Invoke(() => _managerWindow.SelectNote(note));
-        };
+        Log($"RestoreAll() executed, Active Windows = {_manager.Windows.Count}");
 
         // Hotkeys
         _hotkeys = new HotkeyService();
-        _hotkeys.NewNoteRequested += (_, _) => Dispatcher.Invoke(() =>
-        {
-            var win = _manager.CreateNote();
-            _managerWindow.SelectNote(win.Model);
-        });
+        _hotkeys.NewNoteRequested += (_, _) => Dispatcher.Invoke(() => _manager.CreateNote());
         _hotkeys.ToggleVisibilityRequested += (_, _) => Dispatcher.Invoke(() => _manager.ToggleVisibility());
         _hotkeys.Register();
-        Log("Hotkeys registered");
+        Log("Hotkeys registered (Message-Only Window)");
 
-        // Tray controller with GhostNotes logo & Open Manager action
-        _tray = new TrayController(_manager, _hotkeys, _captureGuard, () =>
-        {
-            Dispatcher.Invoke(() =>
-            {
-                _managerWindow.Show();
-                _managerWindow.WindowState = WindowState.Normal;
-                _managerWindow.Activate();
-            });
-        });
+        // Tray controller with GhostNotes logo and context menu
+        _tray = new TrayController(_manager, _hotkeys, _captureGuard);
         Log("TrayController initialized");
 
         if (!gate.SupportsExcludeFromCapture)
@@ -128,7 +101,7 @@ public partial class App : Application
 
         AttachPopupHandler();
 
-        // Capture protection sweep timer — ensures all windows and dropdowns stay invisible to OBS
+        // Capture protection sweep timer — ensures all sticky notes, pills, and popups stay invisible to OBS
         var sweep = new System.Windows.Threading.DispatcherTimer
         {
             Interval = TimeSpan.FromSeconds(1)
@@ -137,12 +110,8 @@ public partial class App : Application
         sweep.Start();
         Log("Capture sweep timer active");
 
-        // Show Manager window on first launch
-        _managerWindow.Show();
-        _managerWindow.Activate();
-
         // Listen for signal from secondary launches
-        var mgrWin = _managerWindow;
+        var manager = _manager;
         _signalThread = new Thread(() =>
         {
             try
@@ -151,12 +120,21 @@ public partial class App : Application
                 {
                     if (_instanceGuard.WaitSignal(1000))
                     {
-                        Log("Received show signal -> Opening Manager");
+                        Log("Received signal from secondary launch -> Bring notes to front or toggle");
                         Dispatcher.Invoke(() =>
                         {
-                            mgrWin.Show();
-                            mgrWin.WindowState = WindowState.Normal;
-                            mgrWin.Activate();
+                            if (manager.Windows.Count == 0)
+                            {
+                                manager.CreateNote();
+                            }
+                            else
+                            {
+                                foreach (var w in manager.Windows)
+                                {
+                                    w.ReapplyProtectionAndShow();
+                                    w.Activate();
+                                }
+                            }
                         });
                     }
                 }
@@ -169,20 +147,6 @@ public partial class App : Application
         };
         _signalThread.Start();
         Log("Signal thread started");
-    }
-
-    private static void TrySetWindowIcon(Window window)
-    {
-        try
-        {
-            var appDir = AppDomain.CurrentDomain.BaseDirectory;
-            var iconPath = Path.Combine(appDir, "Assets", "GhostNotes.ico");
-            if (File.Exists(iconPath))
-            {
-                window.Icon = new BitmapImage(new Uri(iconPath, UriKind.Absolute));
-            }
-        }
-        catch { }
     }
 
     private void AttachPopupHandler()

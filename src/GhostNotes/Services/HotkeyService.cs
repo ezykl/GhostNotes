@@ -30,6 +30,7 @@ public sealed class HotkeyService : IDisposable
     {
         _source = new HwndSource(new HwndSourceParameters("GhostNotesHotkeys")
         {
+            ParentWindow = new IntPtr(-3), // HWND_MESSAGE: pure message-only window, zero taskbar presence
             Width = 0,
             Height = 0
         });

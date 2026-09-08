@@ -11,19 +11,20 @@ namespace GhostNotes;
 
 public sealed class NoteManager : IDisposable
 {
-    private const double CascadeOffset = 24;
+    private const double CascadeOffset = 28;
 
     private readonly NoteRepository _repo;
     private readonly CaptureGuard _guard;
     private readonly List<NoteWindow> _windows = new();
     private readonly List<Note> _notes = new();
     private readonly Dictionary<string, AutosaveScheduler> _schedulers = new();
-    private Point _nextCascade = new(120, 120);
+    private Point _nextCascade = new(100, 100);
 
     public IReadOnlyList<NoteWindow> Windows => _windows;
     public IReadOnlyList<Note> Notes => _notes;
+    public IEnumerable<Note> ClosedNotes => _notes.Where(n => n.IsClosed);
 
-    public event EventHandler<Note>? OpenManagerForNoteRequested;
+    public event EventHandler? NotesStateChanged;
 
     public bool AnyVisible
     {
@@ -47,6 +48,7 @@ public sealed class NoteManager : IDisposable
         var loaded = _repo.LoadAll().ToList();
         _notes.AddRange(loaded);
 
+        int restoredCount = 0;
         foreach (var note in _notes)
         {
             var c = PositionClamp.Clamp(note.X, note.Y, note.Width, note.Height, ScreenRects());
@@ -55,32 +57,20 @@ public sealed class NoteManager : IDisposable
             note.Width = c.W;
             note.Height = c.H;
 
-            if (note.IsDeployed)
+            if (!note.IsClosed)
             {
                 Attach(new NoteWindow(note, _guard));
+                restoredCount++;
             }
         }
-    }
 
-    public Note CreateNoteForTab(string tabId)
-    {
-        var note = new Note
+        // If no notes exist or all are closed, auto-spawn 1 fresh note (Option A)
+        if (restoredCount == 0)
         {
-            TabId = tabId,
-            X = _nextCascade.X,
-            Y = _nextCascade.Y,
-            Markdown = "# New Note\n\nStart writing Markdown here...",
-            IsDeployed = true
-        };
-        _notes.Add(note);
-        _repo.Save(note);
+            CreateNote();
+        }
 
-        _nextCascade = new Point(
-            (_nextCascade.X + CascadeOffset) % Math.Max(300, SystemParameters.WorkArea.Width - 340),
-            (_nextCascade.Y + CascadeOffset) % Math.Max(300, SystemParameters.WorkArea.Height - 260));
-
-        var window = Attach(new NoteWindow(note, _guard));
-        return note;
+        NotesStateChanged?.Invoke(this, EventArgs.Empty);
     }
 
     public NoteWindow CreateNote()
@@ -89,50 +79,44 @@ public sealed class NoteManager : IDisposable
         {
             X = _nextCascade.X,
             Y = _nextCascade.Y,
-            Markdown = "# Welcome to GhostNotes\n\n- Protected from screen recording & OBS\n- Clean Markdown sticky note\n- Double-click to edit in Manager",
-            IsDeployed = true
+            Width = 320,
+            Height = 220,
+            Markdown = "# Quick Note\n\n- Type markdown directly here\n- Minimized notes stick to screen edges\n- OBS & screen capture cannot see this!",
+            IsClosed = false,
+            IsMinimized = false
         };
         _notes.Add(note);
         _repo.Save(note);
-        var window = Attach(new NoteWindow(note, _guard));
+
         _nextCascade = new Point(
-            (_nextCascade.X + CascadeOffset) % Math.Max(300, SystemParameters.WorkArea.Width - 340),
-            (_nextCascade.Y + CascadeOffset) % Math.Max(300, SystemParameters.WorkArea.Height - 260));
+            (_nextCascade.X + CascadeOffset) % Math.Max(300, SystemParameters.WorkArea.Width - 360),
+            (_nextCascade.Y + CascadeOffset) % Math.Max(300, SystemParameters.WorkArea.Height - 280));
+
+        var window = Attach(new NoteWindow(note, _guard));
         window.Activate();
+        NotesStateChanged?.Invoke(this, EventArgs.Empty);
         return window;
     }
 
-    public void NotifyNoteChanged(Note note)
+    public void CloseNote(NoteWindow window)
     {
-        if (!_notes.Contains(note)) _notes.Add(note);
+        window.Model.IsClosed = true;
+        _repo.Save(window.Model);
 
-        if (!_schedulers.TryGetValue(note.Id, out var scheduler))
-        {
-            scheduler = new AutosaveScheduler(() => _repo.Save(note), TimeSpan.FromMilliseconds(500));
-            _schedulers[note.Id] = scheduler;
-        }
-        scheduler.Trigger();
+        _windows.Remove(window);
+        window.Close();
 
-        // Live re-render overlay window if open
-        var win = _windows.FirstOrDefault(w => w.Model.Id == note.Id);
-        if (win != null)
-        {
-            win.RefreshContent();
-            win.ApplyGlassBackground();
-        }
+        NotesStateChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    public void DeleteNoteById(string id)
+    public void PermanentlyDeleteNote(NoteWindow window)
     {
+        var id = window.Model.Id;
         var note = _notes.FirstOrDefault(n => n.Id == id);
         if (note != null) _notes.Remove(note);
 
-        var win = _windows.FirstOrDefault(w => w.Model.Id == id);
-        if (win != null)
-        {
-            _windows.Remove(win);
-            win.Close();
-        }
+        _windows.Remove(window);
+        window.Close();
 
         _repo.Delete(id);
         if (_schedulers.Remove(id, out var scheduler))
@@ -140,38 +124,33 @@ public sealed class NoteManager : IDisposable
             scheduler.Cancel();
             scheduler.Dispose();
         }
-    }
 
-    public void DeleteNote(NoteWindow window)
-    {
-        DeleteNoteById(window.Model.Id);
-    }
-
-    public void DeployActiveTab(string tabId)
-    {
-        bool hadVisible = false;
-        foreach (var w in _windows.Where(w => w.Model.TabId == tabId).ToList())
+        if (_windows.Count == 0 && _notes.Count(n => !n.IsClosed) == 0)
         {
-            if (w.IsVisible)
-            {
-                hadVisible = true;
-                w.Hide();
-            }
+            CreateNote();
         }
 
-        if (hadVisible) return;
+        NotesStateChanged?.Invoke(this, EventArgs.Empty);
+    }
 
-        // Show or create overlays for this tab
-        var notesInTab = _notes.Where(n => n.TabId == tabId || n.TabId == "default").ToList();
-        foreach (var note in notesInTab)
+    public void ReopenNote(Note note)
+    {
+        note.IsClosed = false;
+        _repo.Save(note);
+
+        var existing = _windows.FirstOrDefault(w => w.Model.Id == note.Id);
+        if (existing != null)
         {
-            var win = _windows.FirstOrDefault(w => w.Model.Id == note.Id);
-            if (win == null)
-            {
-                win = Attach(new NoteWindow(note, _guard));
-            }
-            win.ReapplyProtectionAndShow();
+            existing.ReapplyProtectionAndShow();
+            existing.Activate();
         }
+        else
+        {
+            var win = Attach(new NoteWindow(note, _guard));
+            win.Activate();
+        }
+
+        NotesStateChanged?.Invoke(this, EventArgs.Empty);
     }
 
     public void ToggleVisibility()
@@ -198,8 +177,9 @@ public sealed class NoteManager : IDisposable
         if (!_windows.Contains(window)) _windows.Add(window);
         window.ModelChanged += (_, _) => OnNoteModelChanged(window.Model);
         window.GeometryChanged += (_, _) => OnNoteModelChanged(window.Model);
-        window.DeleteRequested += (_, _) => DeleteNote(window);
-        window.EditRequested += (_, _) => OpenManagerForNoteRequested?.Invoke(this, window.Model);
+        window.CloseRequested += (_, _) => CloseNote(window);
+        window.PermanentDeleteRequested += (_, _) => PermanentlyDeleteNote(window);
+        window.NewNoteRequested += (_, _) => CreateNote();
         window.Show();
         return window;
     }
@@ -212,6 +192,7 @@ public sealed class NoteManager : IDisposable
             _schedulers[note.Id] = scheduler;
         }
         scheduler.Trigger();
+        NotesStateChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private static (double X, double Y, double W, double H)[] ScreenRects()

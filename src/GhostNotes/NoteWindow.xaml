@@ -7,10 +7,12 @@
         Topmost="True"
         ShowInTaskbar="False"
         ResizeMode="NoResize"
-        MinWidth="180"
-        MinHeight="120"
+        MinWidth="140"
+        MinHeight="34"
         Title="GhostNote">
+
     <Window.Resources>
+        <!-- Transparent Grip style for 8-way resize -->
         <Style x:Key="Grip" TargetType="Thumb">
             <Setter Property="Template">
                 <Setter.Value>
@@ -20,55 +22,186 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Header button style -->
+        <Style x:Key="HdrBtn" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#25000000"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#40000000"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
-    <Grid>
-        <Border x:Name="Glass" CornerRadius="12" BorderBrush="#80FFFFFF" BorderThickness="1">
+
+    <Grid x:Name="RootGrid">
+        <!-- Main Note Glass Container -->
+        <Border x:Name="Glass" CornerRadius="12" BorderBrush="#60FFFFFF" BorderThickness="1">
             <Border.Effect>
-                <DropShadowEffect BlurRadius="16" ShadowDepth="2" Opacity="0.35"/>
+                <DropShadowEffect BlurRadius="16" ShadowDepth="2" Opacity="0.30"/>
             </Border.Effect>
             <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="28"/>
-                    <RowDefinition Height="*"/>
+                    <!-- Header / Drag Strip -->
+                    <RowDefinition Height="32"/>
+                    <!-- Content Body -->
+                    <RowDefinition Height="*" x:Name="BodyRow"/>
                 </Grid.RowDefinitions>
-                
-                <!-- Modern Overlay Drag Strip -->
-                <Grid x:Name="DragStrip" Grid.Row="0" Cursor="SizeAll" Background="#15000000"
-                      MouseLeftButtonDown="OnDragStripDown">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
-                        <!-- Ghost Icon -->
-                        <Path Data="{StaticResource IconShield}" Width="12" Height="12" 
-                              Stroke="#2277BB" StrokeThickness="1.5" Fill="#38BDF8" Stretch="Uniform" Margin="0,0,6,0"/>
-                        <TextBlock x:Name="TxtTitle" Text="GhostNote" FontSize="11.5" FontWeight="SemiBold" 
-                                   Foreground="#99000000" TextTrimming="CharacterEllipsis" MaxWidth="220"/>
-                    </StackPanel>
-                    
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,4,0">
-                        <!-- Edit in Manager button -->
-                        <Button Width="22" Height="22" Background="Transparent" BorderThickness="0" Cursor="Hand"
-                                Click="OnEditClicked" ToolTip="Edit in Manager (Double-click note)">
-                            <Path Data="{StaticResource IconEdit}" Width="11" Height="11" Stroke="#88000000" StrokeThickness="1.5" Stretch="Uniform"/>
-                        </Button>
-                        <!-- Close / Hide button -->
-                        <Button x:Name="BtnClose" Width="22" Height="22" Background="Transparent" BorderThickness="0" Cursor="Hand"
-                                Click="OnCloseClicked" ToolTip="Close / Undeploy Note">
-                            <Path Data="{StaticResource IconClose}" Width="11" Height="11" Stroke="#88000000" StrokeThickness="1.6" Stretch="Uniform"/>
-                        </Button>
-                    </StackPanel>
-                </Grid>
 
-                <!-- Rendered Markdown Content Viewer -->
-                <FlowDocumentScrollViewer x:Name="Viewer" Grid.Row="1"
-                                          VerticalScrollBarVisibility="Auto"
-                                          HorizontalScrollBarVisibility="Disabled"
-                                          Background="Transparent"
-                                          BorderThickness="0"
-                                          MouseDoubleClick="OnViewerDoubleClick"/>
+                <!-- ════════════ HEADER BAR ════════════ -->
+                <Border Grid.Row="0" x:Name="HeaderBorder" Background="#20000000" CornerRadius="11,11,0,0"
+                        Cursor="SizeAll" MouseLeftButtonDown="OnHeaderMouseDown">
+                    <Grid Margin="6,0,4,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Cute Ghost Logo (Figma-inspired vector) -->
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="2,0,6,0">
+                            <!-- Glowing Ghost Path -->
+                            <Canvas Width="16" Height="16" VerticalAlignment="Center">
+                                <Path Data="M3,6 C3,3.5 5,1.5 8,1.5 C11,1.5 13,3.5 13,6 L13,12 C13,13.2 12,14 11,13.5 C10,13 9.5,14 8,14 C6.5,14 6,13 5,13.5 C4,14 3,13.2 3,12 Z"
+                                      Fill="#FFFFFF" Stroke="#38BDF8" StrokeThickness="1.2">
+                                    <Path.Effect>
+                                        <DropShadowEffect BlurRadius="4" ShadowDepth="0" Color="#38BDF8" Opacity="0.8"/>
+                                    </Path.Effect>
+                                </Path>
+                                <!-- Eyes -->
+                                <Ellipse Canvas.Left="5.5" Canvas.Top="5" Width="1.8" Height="2" Fill="#0F172A"/>
+                                <Ellipse Canvas.Left="8.7" Canvas.Top="5" Width="1.8" Height="2" Fill="#0F172A"/>
+                            </Canvas>
+                        </StackPanel>
+
+                        <!-- Note Title -->
+                        <TextBlock x:Name="TxtTitle" Grid.Column="1" Text="GhostNote" FontSize="11.5" FontWeight="SemiBold"
+                                   Foreground="#99000000" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="2,0,4,0"/>
+
+                        <!-- Header Action Buttons -->
+                        <StackPanel x:Name="HeaderButtons" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <!-- New Note Button (+) -->
+                            <Button Style="{StaticResource HdrBtn}" Click="OnNewNoteClicked" ToolTip="New Note (Ctrl+Alt+N)">
+                                <Path Data="{StaticResource IconPlus}" Width="10" Height="10" Stroke="#77000000" StrokeThickness="1.8" Stretch="Uniform"/>
+                            </Button>
+                            <!-- Settings Gear Button -->
+                            <Button x:Name="BtnSettings" Style="{StaticResource HdrBtn}" Click="OnSettingsClicked" ToolTip="Note Settings (Color, Opacity, Font)">
+                                <Path Data="{StaticResource IconSettings}" Width="11" Height="11" Stroke="#77000000" StrokeThickness="1.5" Stretch="Uniform"/>
+                            </Button>
+                            <!-- Minimize Button (—) to Ghost Pill -->
+                            <Button Style="{StaticResource HdrBtn}" Click="OnMinimizeClicked" ToolTip="Minimize to Edge Pill">
+                                <Path Data="{StaticResource IconMinus}" Width="10" Height="10" Stroke="#77000000" StrokeThickness="2" Stretch="Uniform"/>
+                            </Button>
+                            <!-- Close / Hide Button (✕) -->
+                            <Button Style="{StaticResource HdrBtn}" Click="OnCloseClicked" ToolTip="Close / Hide Note (Reopen from tray)">
+                                <Path Data="{StaticResource IconClose}" Width="10" Height="10" Stroke="#77000000" StrokeThickness="1.6" Stretch="Uniform"/>
+                            </Button>
+                        </StackPanel>
+
+                        <!-- Minimized Pill Hint (shown only when collapsed) -->
+                        <TextBlock x:Name="PillHint" Grid.Column="2" Text="Click to open" FontSize="10" FontStyle="Italic"
+                                   Foreground="#88000000" VerticalAlignment="Center" Margin="0,0,6,0" Visibility="Collapsed"/>
+                    </Grid>
+                </Border>
+
+                <!-- ════════════ DIRECT IN-PLACE EDITOR ════════════ -->
+                <Grid Grid.Row="1" x:Name="BodyContainer">
+                    <RichTextBox x:Name="EditorBox"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 Padding="10,6,10,10"
+                                 Foreground="#DD000000"
+                                 FontFamily="Segoe UI, -apple-system, system-ui, sans-serif"
+                                 FontSize="13.5"
+                                 AcceptsReturn="True"
+                                 AcceptsTab="True"
+                                 VerticalScrollBarVisibility="Auto"
+                                 HorizontalScrollBarVisibility="Disabled"
+                                 TextChanged="OnEditorTextChanged"/>
+
+                    <!-- ════════════ IN-PLACE SETTINGS FLYOUT ════════════ -->
+                    <Border x:Name="SettingsFlyout" VerticalAlignment="Top" HorizontalAlignment="Right"
+                            Background="#F01E293B" BorderBrush="#475569" BorderThickness="1" CornerRadius="8"
+                            Padding="12,10" Margin="0,4,8,0" Width="180" Visibility="Collapsed">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.4"/>
+                        </Border.Effect>
+                        <StackPanel>
+                            <!-- Flyout Title -->
+                            <Grid Margin="0,0,0,8">
+                                <TextBlock Text="Note Settings" FontSize="11" FontWeight="Bold" Foreground="#F8FAFC"/>
+                                <Button HorizontalAlignment="Right" Width="18" Height="18" Background="Transparent" BorderThickness="0"
+                                        Cursor="Hand" Click="OnCloseSettingsClicked">
+                                    <Path Data="{StaticResource IconClose}" Width="8" Height="8" Stroke="#94A3B8" StrokeThickness="1.6" Stretch="Uniform"/>
+                                </Button>
+                            </Grid>
+
+                            <!-- Color Tint Swatches -->
+                            <TextBlock Text="Color Tint" FontSize="10.5" FontWeight="Medium" Foreground="#94A3B8" Margin="0,0,0,6"/>
+                            <WrapPanel x:Name="TintWrapPanel" Margin="0,0,0,10">
+                                <Border Width="20" Height="20" Background="#FFF59D" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
+                                        BorderBrush="#38BDF8" BorderThickness="2" MouseLeftButtonDown="OnSelectTint" Tag="#FFF59D" ToolTip="Yellow"/>
+                                <Border Width="20" Height="20" Background="#BBDEFB" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
+                                        BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectTint" Tag="#BBDEFB" ToolTip="Sky Blue"/>
+                                <Border Width="20" Height="20" Background="#C8E6C9" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
+                                        BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectTint" Tag="#C8E6C9" ToolTip="Mint Green"/>
+                                <Border Width="20" Height="20" Background="#F8BBD0" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
+                                        BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectTint" Tag="#F8BBD0" ToolTip="Pastel Pink"/>
+                                <Border Width="20" Height="20" Background="#D1C4E9" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
+                                        BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectTint" Tag="#D1C4E9" ToolTip="Lavender"/>
+                                <Border Width="20" Height="20" Background="#FFFFFF" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
+                                        BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectTint" Tag="#FFFFFF" ToolTip="White"/>
+                            </WrapPanel>
+
+                            <!-- Opacity Slider -->
+                            <Grid Margin="0,0,0,2">
+                                <TextBlock Text="Glass Opacity" FontSize="10.5" FontWeight="Medium" Foreground="#94A3B8"/>
+                                <TextBlock x:Name="TxtOpacityVal" Text="85%" FontSize="10" Foreground="#64748B" HorizontalAlignment="Right"/>
+                            </Grid>
+                            <Slider x:Name="SliderOpacity" Minimum="0.3" Maximum="1.0" Value="0.85" SmallChange="0.05" LargeChange="0.1"
+                                    ValueChanged="OnOpacityValueChanged" Margin="0,0,0,10"/>
+
+                            <!-- Font Size -->
+                            <Grid Margin="0,0,0,2">
+                                <TextBlock Text="Font Size" FontSize="10.5" FontWeight="Medium" Foreground="#94A3B8"/>
+                                <TextBlock x:Name="TxtFontSizeVal" Text="14pt" FontSize="10" Foreground="#64748B" HorizontalAlignment="Right"/>
+                            </Grid>
+                            <Slider x:Name="SliderFontSize" Minimum="10" Maximum="24" Value="14" IsSnapToTickEnabled="True" TickFrequency="1"
+                                    ValueChanged="OnFontSizeValueChanged" Margin="0,0,0,12"/>
+
+                            <!-- Permanent Delete Button -->
+                            <Button Background="#450A0A" BorderBrush="#7F1D1D" BorderThickness="1" Foreground="#FCA5A5"
+                                    Height="26" Padding="8,0" Cursor="Hand" Click="OnPermanentDeleteClicked" ToolTip="Permanently remove note from disk">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <Path Data="{StaticResource IconTrash}" Width="10" Height="10" Stroke="#FCA5A5" StrokeThickness="1.5" Stretch="Uniform" Margin="0,0,5,0"/>
+                                    <TextBlock Text="Delete Permanently" FontSize="10.5" FontWeight="SemiBold"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                </Grid>
             </Grid>
         </Border>
 
-        <!-- 8-Direction Resize Grips -->
-        <Grid>
+        <!-- ════════════ 8-DIRECTION RESIZE GRIPS ════════════ -->
+        <Grid x:Name="ResizeGrips">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="8"/>
                 <ColumnDefinition/>

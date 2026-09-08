@@ -1,8 +1,10 @@
 using System;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 using GhostNotes.Interop;
+using GhostNotes.Models;
 using GhostNotes.Services;
 using Application = System.Windows.Application;
 
@@ -11,26 +13,27 @@ namespace GhostNotes;
 public sealed class TrayController : IDisposable
 {
     private readonly NoteManager _manager;
-    private readonly Action _openManager;
     private readonly NotifyIcon _icon;
     private bool _disposed;
 
-    public TrayController(NoteManager manager, HotkeyService hotkeys, CaptureGuard guard, Action? openManager = null)
+    public TrayController(NoteManager manager, HotkeyService hotkeys, CaptureGuard guard)
     {
         _manager = manager;
-        _openManager = openManager ?? (() => { });
 
         _icon = new NotifyIcon
         {
             Icon = BuildIcon(),
-            Text = "GhostNotes — Protected",
-            Visible = true,
-            ContextMenuStrip = BuildMenu()
+            Text = "GhostNotes — OBS Protected",
+            Visible = true
         };
 
-        _icon.DoubleClick += (_, _) => _openManager();
+        RebuildMenu();
+
+        _icon.DoubleClick += (_, _) => _manager.CreateNote();
         hotkeys.HotkeyNotice += (_, message) => ShowWarning(message);
         guard.ProtectionStatusChanged += (_, on) => UpdateTooltip(on);
+        _manager.NotesStateChanged += (_, _) => RebuildMenu();
+
         UpdateTooltip(guard.IsProtected);
     }
 
@@ -38,7 +41,6 @@ public sealed class TrayController : IDisposable
     {
         try
         {
-            // Check local Assets directory
             var appDir = AppDomain.CurrentDomain.BaseDirectory;
             var path = Path.Combine(appDir, "Assets", "GhostNotes.ico");
             if (File.Exists(path))
@@ -46,7 +48,6 @@ public sealed class TrayController : IDisposable
                 return new Icon(path, 32, 32);
             }
 
-            // Or render on the fly from IconBuilder vector geometry
             using var bmp = IconBuilder.RenderGhostLogo(32);
             return Icon.FromHandle(bmp.GetHicon());
         }
@@ -56,25 +57,69 @@ public sealed class TrayController : IDisposable
         }
     }
 
-    private ContextMenuStrip BuildMenu()
+    private void RebuildMenu()
     {
         var menu = new ContextMenuStrip();
-        var openItem = new ToolStripMenuItem("Open Manager", null, (_, _) => _openManager());
-        openItem.Font = new Font(openItem.Font, FontStyle.Bold);
-        menu.Items.Add(openItem);
+
+        // New Note
+        var newNoteItem = new ToolStripMenuItem("New Note (Ctrl+Alt+N)", null, (_, _) => _manager.CreateNote());
+        newNoteItem.Font = new Font(newNoteItem.Font, FontStyle.Bold);
+        menu.Items.Add(newNoteItem);
+
+        // Show/Hide All
+        menu.Items.Add(new ToolStripMenuItem("Show / Hide All (Ctrl+Alt+S)", null, (_, _) => _manager.ToggleVisibility()));
+        menu.Items.Add(new ToolStripSeparator());
+
+        // Active Notes Submenu
+        var activeNotes = _manager.Windows.ToList();
+        if (activeNotes.Count > 0)
+        {
+            var activeMenu = new ToolStripMenuItem($"Active Notes ({activeNotes.Count})");
+            foreach (var win in activeNotes)
+            {
+                var title = string.IsNullOrWhiteSpace(win.Model.Title) ? "Untitled Note" : win.Model.Title;
+                if (title.Length > 28) title = title.Substring(0, 25) + "...";
+                if (win.Model.IsMinimized) title += " [Pill]";
+
+                activeMenu.DropDownItems.Add(new ToolStripMenuItem(title, null, (_, _) =>
+                {
+                    if (win.Model.IsMinimized) win.SetMinimized(false);
+                    win.ReapplyProtectionAndShow();
+                    win.Activate();
+                }));
+            }
+            menu.Items.Add(activeMenu);
+        }
+
+        // Closed Notes Submenu
+        var closedNotes = _manager.ClosedNotes.ToList();
+        if (closedNotes.Count > 0)
+        {
+            var closedMenu = new ToolStripMenuItem($"Closed Notes ({closedNotes.Count})");
+            foreach (var note in closedNotes)
+            {
+                var title = string.IsNullOrWhiteSpace(note.Title) ? "Untitled Note" : note.Title;
+                if (title.Length > 28) title = title.Substring(0, 25) + "...";
+
+                closedMenu.DropDownItems.Add(new ToolStripMenuItem(title, null, (_, _) =>
+                {
+                    _manager.ReopenNote(note);
+                }));
+            }
+            menu.Items.Add(closedMenu);
+        }
 
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(new ToolStripMenuItem("New Note (Ctrl+Alt+N)", null, (_, _) => _manager.CreateNote()));
-        menu.Items.Add(new ToolStripMenuItem("Show / Hide Overlays (Ctrl+Alt+S)", null, (_, _) => _manager.ToggleVisibility()));
-        menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("Exit", null, (_, _) => Application.Current.Shutdown()));
-        return menu;
+
+        _icon.ContextMenuStrip = menu;
+        UpdateTooltip(true);
     }
 
     public void UpdateTooltip(bool protectionOn)
     {
-        _icon.Text =
-            $"GhostNotes — {_manager.Windows.Count} notes — OBS Protection: {(protectionOn ? "ON" : "OFF")}";
+        int count = _manager.Windows.Count;
+        _icon.Text = $"GhostNotes — {count} active notes — OBS Stealth: {(protectionOn ? "ON" : "OFF")}";
     }
 
     public void ShowWarning(string message) =>
