@@ -67,7 +67,8 @@
 
                 <!-- ════════════ HEADER BAR ════════════ -->
                 <Border Grid.Row="0" x:Name="HeaderBorder" Background="#20000000" CornerRadius="11,11,0,0"
-                        Cursor="SizeAll" MouseLeftButtonDown="OnHeaderMouseDown">
+                        Cursor="SizeAll" MouseLeftButtonDown="OnHeaderMouseDown"
+                        PreviewMouseMove="OnHeaderMouseMove" MouseLeftButtonUp="OnHeaderMouseUp">
                     <Grid Margin="6,0,4,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -115,9 +116,14 @@
                             </Button>
                         </StackPanel>
 
-                        <!-- Minimized Pill Hint (shown only when collapsed) -->
-                        <TextBlock x:Name="PillHint" Grid.Column="2" Text="Click to open" FontSize="10" FontStyle="Italic"
-                                   Foreground="#88000000" VerticalAlignment="Center" Margin="0,0,6,0" Visibility="Collapsed"/>
+                        <!-- Minimized Pill Controls (shown only when collapsed) -->
+                        <StackPanel x:Name="PillControls" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
+                            <TextBlock x:Name="PillHint" Text="Click to open" FontSize="10" FontStyle="Italic"
+                                       Foreground="#88000000" VerticalAlignment="Center" Margin="0,0,4,0" Cursor="Hand" MouseLeftButtonUp="OnRestorePillClicked"/>
+                            <Button Style="{StaticResource HdrBtn}" Click="OnRestorePillClicked" ToolTip="Expand Note">
+                                <Path Data="{StaticResource IconExpand}" Width="9" Height="9" Stroke="#77000000" StrokeThickness="1.6" Stretch="Uniform"/>
+                            </Button>
+                        </StackPanel>
                     </Grid>
                 </Border>
 
@@ -135,86 +141,88 @@
                                  VerticalScrollBarVisibility="Auto"
                                  HorizontalScrollBarVisibility="Disabled"
                                  TextChanged="OnEditorTextChanged"/>
-
-                    <!-- ════════════ IN-PLACE SETTINGS FLYOUT ════════════ -->
-                    <Border x:Name="SettingsFlyout" VerticalAlignment="Top" HorizontalAlignment="Right"
-                            Background="#F01E293B" BorderBrush="#475569" BorderThickness="1" CornerRadius="8"
-                            Padding="12,10" Margin="0,4,8,0" Width="180" Visibility="Collapsed">
-                        <Border.Effect>
-                            <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.4"/>
-                        </Border.Effect>
-                        <StackPanel>
-                            <!-- Flyout Title -->
-                            <Grid Margin="0,0,0,8">
-                                <TextBlock Text="Note Settings" FontSize="11" FontWeight="Bold" Foreground="#F8FAFC"/>
-                                <Button HorizontalAlignment="Right" Width="18" Height="18" Background="Transparent" BorderThickness="0"
-                                        Cursor="Hand" Click="OnCloseSettingsClicked">
-                                    <Path Data="{StaticResource IconClose}" Width="8" Height="8" Stroke="#94A3B8" StrokeThickness="1.6" Stretch="Uniform"/>
-                                </Button>
-                            </Grid>
-
-                            <!-- Color Tint Swatches -->
-                            <TextBlock Text="Color Tint" FontSize="10.5" FontWeight="Medium" Foreground="#94A3B8" Margin="0,0,0,6"/>
-                            <WrapPanel x:Name="TintWrapPanel" Margin="0,0,0,8">
-                                <Border Width="20" Height="20" Background="#FFF59D" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
-                                        BorderBrush="#38BDF8" BorderThickness="2" MouseLeftButtonDown="OnSelectTint" Tag="#FFF59D" ToolTip="Yellow"/>
-                                <Border Width="20" Height="20" Background="#BBDEFB" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
-                                        BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectTint" Tag="#BBDEFB" ToolTip="Sky Blue"/>
-                                <Border Width="20" Height="20" Background="#C8E6C9" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
-                                        BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectTint" Tag="#C8E6C9" ToolTip="Mint Green"/>
-                                <Border Width="20" Height="20" Background="#F8BBD0" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
-                                        BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectTint" Tag="#F8BBD0" ToolTip="Pastel Pink"/>
-                                <Border Width="20" Height="20" Background="#D1C4E9" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
-                                        BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectTint" Tag="#D1C4E9" ToolTip="Lavender"/>
-                                <Border Width="20" Height="20" Background="#FFFFFF" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
-                                        BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectTint" Tag="#FFFFFF" ToolTip="White"/>
-                            </WrapPanel>
-
-                            <!-- Font Color Swatches -->
-                            <TextBlock Text="Font Color" FontSize="10.5" FontWeight="Medium" Foreground="#94A3B8" Margin="0,0,0,6"/>
-                            <WrapPanel x:Name="FontColorWrapPanel" Margin="0,0,0,10">
-                                <Border Width="20" Height="20" Background="#1E293B" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
-                                        BorderBrush="#38BDF8" BorderThickness="2" MouseLeftButtonDown="OnSelectFontColor" Tag="#1E293B" ToolTip="Black / Charcoal"/>
-                                <Border Width="20" Height="20" Background="#FFFFFF" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
-                                        BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectFontColor" Tag="#FFFFFF" ToolTip="White"/>
-                                <Border Width="20" Height="20" Background="#DC2626" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
-                                        BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectFontColor" Tag="#DC2626" ToolTip="Crimson Red"/>
-                                <Border Width="20" Height="20" Background="#0284C7" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
-                                        BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectFontColor" Tag="#0284C7" ToolTip="Ocean Blue"/>
-                                <Border Width="20" Height="20" Background="#059669" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
-                                        BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectFontColor" Tag="#059669" ToolTip="Emerald Green"/>
-                                <Border Width="20" Height="20" Background="#7C3AED" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
-                                        BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectFontColor" Tag="#7C3AED" ToolTip="Royal Purple"/>
-                            </WrapPanel>
-
-                            <!-- Note Opacity Slider -->
-                            <Grid Margin="0,0,0,2">
-                                <TextBlock Text="Note Opacity" FontSize="10.5" FontWeight="Medium" Foreground="#94A3B8"/>
-                                <TextBlock x:Name="TxtOpacityVal" Text="85%" FontSize="10" Foreground="#64748B" HorizontalAlignment="Right"/>
-                            </Grid>
-                            <Slider x:Name="SliderOpacity" Minimum="0.2" Maximum="1.0" Value="0.85" SmallChange="0.05" LargeChange="0.1"
-                                    ValueChanged="OnOpacityValueChanged" Margin="0,0,0,10"/>
-
-                            <!-- Font Size -->
-                            <Grid Margin="0,0,0,2">
-                                <TextBlock Text="Font Size" FontSize="10.5" FontWeight="Medium" Foreground="#94A3B8"/>
-                                <TextBlock x:Name="TxtFontSizeVal" Text="14pt" FontSize="10" Foreground="#64748B" HorizontalAlignment="Right"/>
-                            </Grid>
-                            <Slider x:Name="SliderFontSize" Minimum="10" Maximum="24" Value="14" IsSnapToTickEnabled="True" TickFrequency="1"
-                                    ValueChanged="OnFontSizeValueChanged" Margin="0,0,0,12"/>
-
-                            <!-- Permanent Delete Button -->
-                            <Button Background="#450A0A" BorderBrush="#7F1D1D" BorderThickness="1" Foreground="#FCA5A5"
-                                    Height="26" Padding="8,0" Cursor="Hand" Click="OnPermanentDeleteClicked" ToolTip="Permanently remove note from disk">
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <Path Data="{StaticResource IconTrash}" Width="10" Height="10" Stroke="#FCA5A5" StrokeThickness="1.5" Stretch="Uniform" Margin="0,0,5,0"/>
-                                    <TextBlock Text="Delete Permanently" FontSize="10.5" FontWeight="SemiBold"/>
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
-                    </Border>
                 </Grid>
             </Grid>
+        </Border>
+
+        <!-- ════════════ IN-PLACE SETTINGS FLYOUT (Solid Overlay) ════════════ -->
+        <Border x:Name="SettingsFlyout" VerticalAlignment="Top" HorizontalAlignment="Right"
+                Background="#FF1E293B" BorderBrush="#475569" BorderThickness="1" CornerRadius="8"
+                Padding="12,10" Margin="0,34,8,8" Width="186" MaxHeight="320" Panel.ZIndex="100" Visibility="Collapsed">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="16" ShadowDepth="3" Opacity="0.5"/>
+            </Border.Effect>
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="0,0,2,0">
+                    <!-- Flyout Title -->
+                    <Grid Margin="0,0,0,8">
+                        <TextBlock Text="Note Settings" FontSize="11" FontWeight="Bold" Foreground="#F8FAFC"/>
+                        <Button HorizontalAlignment="Right" Width="18" Height="18" Background="Transparent" BorderThickness="0"
+                                Cursor="Hand" Click="OnCloseSettingsClicked">
+                            <Path Data="{StaticResource IconClose}" Width="8" Height="8" Stroke="#94A3B8" StrokeThickness="1.6" Stretch="Uniform"/>
+                        </Button>
+                    </Grid>
+
+                    <!-- Color Tint Swatches -->
+                    <TextBlock Text="Color Tint" FontSize="10.5" FontWeight="Medium" Foreground="#94A3B8" Margin="0,0,0,6"/>
+                    <WrapPanel x:Name="TintWrapPanel" Margin="0,0,0,8">
+                        <Border Width="20" Height="20" Background="#FFF59D" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
+                                BorderBrush="#38BDF8" BorderThickness="2" MouseLeftButtonDown="OnSelectTint" Tag="#FFF59D" ToolTip="Yellow"/>
+                        <Border Width="20" Height="20" Background="#BBDEFB" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
+                                BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectTint" Tag="#BBDEFB" ToolTip="Sky Blue"/>
+                        <Border Width="20" Height="20" Background="#C8E6C9" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
+                                BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectTint" Tag="#C8E6C9" ToolTip="Mint Green"/>
+                        <Border Width="20" Height="20" Background="#F8BBD0" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
+                                BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectTint" Tag="#F8BBD0" ToolTip="Pastel Pink"/>
+                        <Border Width="20" Height="20" Background="#D1C4E9" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
+                                BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectTint" Tag="#D1C4E9" ToolTip="Lavender"/>
+                        <Border Width="20" Height="20" Background="#FFFFFF" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
+                                BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectTint" Tag="#FFFFFF" ToolTip="White"/>
+                    </WrapPanel>
+
+                    <!-- Font Color Swatches -->
+                    <TextBlock Text="Font Color" FontSize="10.5" FontWeight="Medium" Foreground="#94A3B8" Margin="0,0,0,6"/>
+                    <WrapPanel x:Name="FontColorWrapPanel" Margin="0,0,0,10">
+                        <Border Width="20" Height="20" Background="#1E293B" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
+                                BorderBrush="#38BDF8" BorderThickness="2" MouseLeftButtonDown="OnSelectFontColor" Tag="#1E293B" ToolTip="Black / Charcoal"/>
+                        <Border Width="20" Height="20" Background="#FFFFFF" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
+                                BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectFontColor" Tag="#FFFFFF" ToolTip="White"/>
+                        <Border Width="20" Height="20" Background="#DC2626" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
+                                BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectFontColor" Tag="#DC2626" ToolTip="Crimson Red"/>
+                        <Border Width="20" Height="20" Background="#0284C7" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
+                                BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectFontColor" Tag="#0284C7" ToolTip="Ocean Blue"/>
+                        <Border Width="20" Height="20" Background="#059669" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
+                                BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectFontColor" Tag="#059669" ToolTip="Emerald Green"/>
+                        <Border Width="20" Height="20" Background="#7C3AED" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
+                                BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectFontColor" Tag="#7C3AED" ToolTip="Royal Purple"/>
+                    </WrapPanel>
+
+                    <!-- Note Opacity Slider -->
+                    <Grid Margin="0,0,0,2">
+                        <TextBlock Text="Note Opacity" FontSize="10.5" FontWeight="Medium" Foreground="#94A3B8"/>
+                        <TextBlock x:Name="TxtOpacityVal" Text="85%" FontSize="10" Foreground="#64748B" HorizontalAlignment="Right"/>
+                    </Grid>
+                    <Slider x:Name="SliderOpacity" Minimum="0.2" Maximum="1.0" Value="0.85" SmallChange="0.05" LargeChange="0.1"
+                            ValueChanged="OnOpacityValueChanged" Margin="0,0,0,10"/>
+
+                    <!-- Font Size -->
+                    <Grid Margin="0,0,0,2">
+                        <TextBlock Text="Font Size" FontSize="10.5" FontWeight="Medium" Foreground="#94A3B8"/>
+                        <TextBlock x:Name="TxtFontSizeVal" Text="14pt" FontSize="10" Foreground="#64748B" HorizontalAlignment="Right"/>
+                    </Grid>
+                    <Slider x:Name="SliderFontSize" Minimum="10" Maximum="24" Value="14" IsSnapToTickEnabled="True" TickFrequency="1"
+                            ValueChanged="OnFontSizeValueChanged" Margin="0,0,0,12"/>
+
+                    <!-- Permanent Delete Button -->
+                    <Button Background="#450A0A" BorderBrush="#7F1D1D" BorderThickness="1" Foreground="#FCA5A5"
+                            Height="26" Padding="8,0" Cursor="Hand" Click="OnPermanentDeleteClicked" ToolTip="Permanently remove note from disk">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <Path Data="{StaticResource IconTrash}" Width="10" Height="10" Stroke="#FCA5A5" StrokeThickness="1.5" Stretch="Uniform" Margin="0,0,5,0"/>
+                            <TextBlock Text="Delete Permanently" FontSize="10.5" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </ScrollViewer>
         </Border>
 
         <!-- ════════════ 8-DIRECTION RESIZE GRIPS ════════════ -->

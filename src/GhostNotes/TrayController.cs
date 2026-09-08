@@ -110,10 +110,63 @@ public sealed class TrayController : IDisposable
         }
 
         menu.Items.Add(new ToolStripSeparator());
+
+        // Start with Windows toggle
+        var startWithWindowsItem = new ToolStripMenuItem("Start with Windows")
+        {
+            Checked = IsStartWithWindowsEnabled(),
+            CheckOnClick = true
+        };
+        startWithWindowsItem.CheckedChanged += (_, _) =>
+        {
+            SetStartWithWindows(startWithWindowsItem.Checked);
+        };
+        menu.Items.Add(startWithWindowsItem);
+
+        menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("Exit", null, (_, _) => Application.Current.Shutdown()));
 
         _icon.ContextMenuStrip = menu;
         UpdateTooltip(true);
+    }
+
+    private const string RunRegistryKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
+    private const string AppRegistryValueName = "GhostNotes";
+
+    public static bool IsStartWithWindowsEnabled()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(RunRegistryKey, false);
+            return key?.GetValue(AppRegistryValueName) != null;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public static void SetStartWithWindows(bool enable)
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(RunRegistryKey, true);
+            if (key == null) return;
+
+            if (enable)
+            {
+                var exePath = Environment.ProcessPath;
+                if (!string.IsNullOrWhiteSpace(exePath))
+                {
+                    key.SetValue(AppRegistryValueName, $"\"{exePath}\"");
+                }
+            }
+            else
+            {
+                key.DeleteValue(AppRegistryValueName, false);
+            }
+        }
+        catch { }
     }
 
     public void UpdateTooltip(bool protectionOn)

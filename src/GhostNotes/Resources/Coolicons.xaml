@@ -135,4 +135,12 @@
         <PathGeometry Figures="M18.5,2.5 C19.3,1.7 20.7,1.7 21.5,2.5 C22.3,3.3 22.3,4.7 21.5,5.5 L12,15 L8,16 L9,12 Z"/>
     </GeometryGroup>
 
+    <!-- Expand / Maximize -->
+    <GeometryGroup x:Key="IconExpand">
+        <PathGeometry Figures="M15,3 L21,3 L21,9"/>
+        <LineGeometry StartPoint="21,3" EndPoint="14,10"/>
+        <PathGeometry Figures="M9,21 L3,21 L3,15"/>
+        <LineGeometry StartPoint="3,21" EndPoint="10,14"/>
+    </GeometryGroup>
+
 </ResourceDictionary>

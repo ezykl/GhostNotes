@@ -15,6 +15,8 @@ using GhostNotes.Services;
 using Color = System.Windows.Media.Color;
 using ColorConverter = System.Windows.Media.ColorConverter;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
+using MouseEventArgs = System.Windows.Input.MouseEventArgs;
+using MouseButtonEventArgs = System.Windows.Input.MouseButtonEventArgs;
 using Brushes = System.Windows.Media.Brushes;
 
 namespace GhostNotes;
@@ -22,9 +24,10 @@ namespace GhostNotes;
 public partial class NoteWindow : Window
 {
     private readonly CaptureGuard _guard;
-    private IntPtr _accentPtr = IntPtr.Zero;
     private bool _suppressTextEvents;
-    private System.Windows.Point _dragStartPos;
+    private bool _isMouseDownOnHeader;
+    private bool _isDragging;
+    private System.Windows.Point _mouseDownScreenPos;
 
     public Note Model { get; }
 
@@ -71,7 +74,6 @@ public partial class NoteWindow : Window
 
         // Re-enable capture protection (WDA_EXCLUDEFROMCAPTURE)
         _guard.ApplyToWindow(hwnd);
-        TryAcrylic(hwnd);
     }
 
     public void ReapplyProtectionAndShow()
@@ -175,48 +177,116 @@ public partial class NoteWindow : Window
     {
         if (e.LeftButton == MouseButtonState.Pressed)
         {
-            _dragStartPos = e.GetPosition(this);
+            _isMouseDownOnHeader = true;
+            _isDragging = false;
+            _mouseDownScreenPos = PointToScreen(e.GetPosition(this));
+        }
+    }
 
-            if (Model.IsMinimized)
+    private void OnHeaderMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_isMouseDownOnHeader && e.LeftButton == MouseButtonState.Pressed && !_isDragging)
+        {
+            var currentScreenPos = PointToScreen(e.GetPosition(this));
+            var deltaX = currentScreenPos.X - _mouseDownScreenPos.X;
+            var deltaY = currentScreenPos.Y - _mouseDownScreenPos.Y;
+
+            // If moved more than 4 pixels, initiate dragging
+            if (Math.Sqrt(deltaX * deltaX + deltaY * deltaY) > 4)
             {
-                // Dragging or clicking the minimized pill
-                DragMove();
-
-                // Snap to screen edge if near
-                SnapToNearestEdge();
-
-                // If user didn't drag far, treat as click to restore
-                var endPos = e.GetPosition(this);
-                if (Math.Abs(endPos.X - _dragStartPos.X) < 5 && Math.Abs(endPos.Y - _dragStartPos.Y) < 5)
+                _isDragging = true;
+                try
                 {
-                    SetMinimized(false);
+                    DragMove();
                 }
-            }
-            else
-            {
-                DragMove();
+                catch { }
+
+                _isMouseDownOnHeader = false;
+                _isDragging = false;
+                if (Model.IsMinimized)
+                {
+                    SnapToNearestEdge();
+                }
             }
         }
     }
 
-    private void SnapToNearestEdge()
+    private void OnHeaderMouseUp(object sender, MouseButtonEventArgs e)
     {
-        foreach (var screen in System.Windows.Forms.Screen.AllScreens)
+        if (_isMouseDownOnHeader)
         {
-            var bounds = screen.WorkingArea;
-            if (Left >= bounds.Left - 50 && Left <= bounds.Right + 50)
+            _isMouseDownOnHeader = false;
+            if (!_isDragging && Model.IsMinimized)
             {
-                // Snap to left edge
-                if (Math.Abs(Left - bounds.Left) < 30) Left = bounds.Left + 4;
-                // Snap to right edge
-                if (Math.Abs((Left + Width) - bounds.Right) < 30) Left = bounds.Right - Width - 4;
-                // Snap to top
-                if (Math.Abs(Top - bounds.Top) < 30) Top = bounds.Top + 4;
-                // Snap to bottom
-                if (Math.Abs((Top + Height) - bounds.Bottom) < 30) Top = bounds.Bottom - Height - 4;
-                break;
+                // Clicked without dragging while minimized -> restore note!
+                SetMinimized(false);
             }
         }
+    }
+
+    private void OnRestorePillClicked(object sender, RoutedEventArgs e)
+    {
+        SetMinimized(false);
+    }
+
+    private void SnapToNearestEdge()
+    {
+        try
+        {
+            var hwnd = new WindowInteropHelper(this).Handle;
+            var screen = hwnd != IntPtr.Zero
+                ? System.Windows.Forms.Screen.FromHandle(hwnd)
+                : System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)Left, (int)Top));
+
+            var bounds = screen.WorkingArea;
+
+            // Snap to left edge
+            if (Math.Abs(Left - bounds.Left) < 40) Left = bounds.Left + 6;
+            // Snap to right edge
+            else if (Math.Abs((Left + Width) - bounds.Right) < 40) Left = bounds.Right - Width - 6;
+
+            // Snap to top edge
+            if (Math.Abs(Top - bounds.Top) < 40) Top = bounds.Top + 6;
+            // Snap to bottom edge
+            else if (Math.Abs((Top + Height) - bounds.Bottom) < 40) Top = bounds.Bottom - Height - 6;
+
+            // Keep within working bounds
+            Left = Math.Clamp(Left, bounds.Left, bounds.Right - Width);
+            Top = Math.Clamp(Top, bounds.Top, bounds.Bottom - Height);
+        }
+        catch { }
+    }
+
+    private void DockToActiveMonitorRightEdge()
+    {
+        try
+        {
+            var hwnd = new WindowInteropHelper(this).Handle;
+            var screen = hwnd != IntPtr.Zero
+                ? System.Windows.Forms.Screen.FromHandle(hwnd)
+                : System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)Left, (int)Top));
+
+            var bounds = screen.WorkingArea;
+            Left = bounds.Right - Width - 8;
+            Top = Math.Clamp(Top, bounds.Top + 10, bounds.Bottom - Height - 10);
+        }
+        catch { }
+    }
+
+    private void ClampToActiveMonitor()
+    {
+        try
+        {
+            var hwnd = new WindowInteropHelper(this).Handle;
+            var screen = hwnd != IntPtr.Zero
+                ? System.Windows.Forms.Screen.FromHandle(hwnd)
+                : System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)Left, (int)Top));
+
+            var bounds = screen.WorkingArea;
+            Left = Math.Clamp(Left, bounds.Left + 4, bounds.Right - Width - 4);
+            Top = Math.Clamp(Top, bounds.Top + 4, bounds.Bottom - Height - 4);
+        }
+        catch { }
     }
 
     // ── MINIMIZE / EXPAND GHOST PILL ──
@@ -234,8 +304,11 @@ public partial class NoteWindow : Window
             Height = 34;
             HeaderBorder.CornerRadius = new CornerRadius(11);
             HeaderButtons.Visibility = Visibility.Collapsed;
-            PillHint.Visibility = Visibility.Visible;
+            PillControls.Visibility = Visibility.Visible;
             ResizeGrips.Visibility = Visibility.Collapsed;
+
+            // Dock to right edge of current monitor
+            DockToActiveMonitorRightEdge();
         }
         else
         {
@@ -244,8 +317,10 @@ public partial class NoteWindow : Window
             Height = Model.RestoreHeight > 100 ? Model.RestoreHeight : 220;
             HeaderBorder.CornerRadius = new CornerRadius(11, 11, 0, 0);
             HeaderButtons.Visibility = Visibility.Visible;
-            PillHint.Visibility = Visibility.Collapsed;
+            PillControls.Visibility = Visibility.Collapsed;
             ResizeGrips.Visibility = Visibility.Visible;
+
+            ClampToActiveMonitor();
         }
         SyncGeometry();
     }
@@ -296,7 +371,6 @@ public partial class NoteWindow : Window
             Model.Tint = hex;
             HighlightSelectedTint(hex);
             ApplyGlassBackground();
-            RefreshAcrylic();
             ModelChanged?.Invoke(this, EventArgs.Empty);
         }
     }
@@ -340,8 +414,8 @@ public partial class NoteWindow : Window
     {
         if (Model is null) return;
         Model.Opacity = Math.Round(e.NewValue, 2);
-        this.Opacity = Model.Opacity;
         if (TxtOpacityVal != null) TxtOpacityVal.Text = $"{(int)(Model.Opacity * 100)}%";
+        ApplyGlassBackground();
         ModelChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -368,14 +442,15 @@ public partial class NoteWindow : Window
         }
     }
 
-    // ── GLASS & ACRYLIC ──
+    // ── GLASS BACKGROUND ──
     public void ApplyGlassBackground()
     {
-        // Change window opacity directly for smooth, natural window transparency
-        this.Opacity = Math.Clamp(Model.Opacity, 0.2, 1.0);
+        // Window itself stays 100% opaque so SettingsFlyout and icons remain crisp & solid
+        this.Opacity = 1.0;
 
         var color = (Color)ColorConverter.ConvertFromString(Model.Tint);
-        Glass.Background = new SolidColorBrush(color);
+        byte alpha = (byte)Math.Clamp((int)(Model.Opacity * 255), 40, 255);
+        Glass.Background = new SolidColorBrush(Color.FromArgb(alpha, color.R, color.G, color.B));
 
         var fontHex = string.IsNullOrWhiteSpace(Model.FontColor) ? "#1E293B" : Model.FontColor;
         var fontColor = (Color)ColorConverter.ConvertFromString(fontHex);
@@ -388,50 +463,6 @@ public partial class NoteWindow : Window
             range.ApplyPropertyValue(TextElement.ForegroundProperty, fontBrush);
         }
         catch { }
-    }
-
-    private void RefreshAcrylic()
-    {
-        var hwnd = new WindowInteropHelper(this).Handle;
-        if (hwnd != IntPtr.Zero) TryAcrylic(hwnd);
-    }
-
-    private void TryAcrylic(IntPtr hwnd)
-    {
-        try
-        {
-            if (_accentPtr != IntPtr.Zero)
-            {
-                Marshal.FreeHGlobal(_accentPtr);
-                _accentPtr = IntPtr.Zero;
-            }
-            int size = Marshal.SizeOf(typeof(NativeMethods.AccentPolicy));
-            var accent = new NativeMethods.AccentPolicy
-            {
-                AccentState = NativeMethods.ACCENT_ENABLE_ACRYLICBLURBEHIND,
-                GradientColor = TintToAbgr(Model.Tint, 0x55)
-            };
-            _accentPtr = Marshal.AllocHGlobal(size);
-            Marshal.StructureToPtr(accent, _accentPtr, false);
-            var data = new NativeMethods.WindowCompositionAttributeData
-            {
-                Attribute = NativeMethods.WCA_ACCENT_POLICY,
-                Data = _accentPtr,
-                SizeOfData = size
-            };
-            if (NativeMethods.SetWindowCompositionAttribute(hwnd, ref data) != 0)
-            {
-                Marshal.FreeHGlobal(_accentPtr);
-                _accentPtr = IntPtr.Zero;
-            }
-        }
-        catch { }
-    }
-
-    private static uint TintToAbgr(string hex, byte alpha)
-    {
-        var c = (Color)ColorConverter.ConvertFromString(hex);
-        return (uint)((alpha << 24) | (c.B << 16) | (c.G << 8) | c.R);
     }
 
     // ── RESIZE ──
