@@ -4,4 +4,8 @@ obj/
 *.user
 TestResults/
 publish/
+publish-folder/
 artifacts/
+.superpowers/
+installer/Output/
+*.log
