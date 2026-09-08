@@ -9,6 +9,8 @@
         ResizeMode="NoResize"
         MinWidth="140"
         MinHeight="34"
+        MouseEnter="OnWindowMouseEnter"
+        MouseLeave="OnWindowMouseLeave"
         Title="GhostNote">
 
     <Window.Resources>
@@ -49,6 +51,61 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Minimalist Modern Scrollbar Style -->
+        <Style x:Key="MinimalScrollBarThumb" TargetType="{x:Type Thumb}">
+            <Setter Property="OverridesDefaultStyle" Value="true"/>
+            <Setter Property="IsTabStop" Value="false"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Thumb}">
+                        <Border x:Name="thumbBorder" Background="#40808080" CornerRadius="3" Margin="1,0"/>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="true">
+                                <Setter TargetName="thumbBorder" Property="Background" Value="#70808080"/>
+                            </Trigger>
+                            <Trigger Property="IsDragging" Value="true">
+                                <Setter TargetName="thumbBorder" Property="Background" Value="#99808080"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="{x:Type ScrollBar}">
+            <Setter Property="Stylus.IsPressAndHoldEnabled" Value="false"/>
+            <Setter Property="Stylus.IsFlicksEnabled" Value="false"/>
+            <Setter Property="Width" Value="6"/>
+            <Setter Property="MinWidth" Value="6"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ScrollBar}">
+                        <Grid x:Name="Bg" SnapsToDevicePixels="true" Background="Transparent">
+                            <Track x:Name="PART_Track" IsDirectionReversed="true">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}" Opacity="0" Focusable="false"/>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}" Opacity="0" Focusable="false"/>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource MinimalScrollBarThumb}"/>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="Orientation" Value="Horizontal">
+                    <Setter Property="Height" Value="6"/>
+                    <Setter Property="MinHeight" Value="6"/>
+                    <Setter Property="Width" Value="Auto"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
 
     <Grid x:Name="RootGrid">
@@ -76,21 +133,26 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <!-- Cute Ghost Logo (Figma-inspired vector) -->
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="2,0,6,0">
-                            <!-- Glowing Ghost Path -->
-                            <Canvas Width="16" Height="16" VerticalAlignment="Center">
-                                <Path Data="M3,6 C3,3.5 5,1.5 8,1.5 C11,1.5 13,3.5 13,6 L13,12 C13,13.2 12,14 11,13.5 C10,13 9.5,14 8,14 C6.5,14 6,13 5,13.5 C4,14 3,13.2 3,12 Z"
-                                      Fill="#FFFFFF" Stroke="#38BDF8" StrokeThickness="1.2">
+                        <!-- Ghost Logo (From GhostNotes.svg with dynamic accent) -->
+                        <Viewbox Grid.Column="0" Width="18" Height="18" VerticalAlignment="Center" Margin="2,0,6,0">
+                            <Canvas Width="26" Height="26">
+                                <!-- Ghost Body Fill -->
+                                <Path x:Name="GhostBody"
+                                      Data="M8.14779 8.97833C8.14779 5.91296 10.6328 3.42798 13.6981 3.42798C16.7635 3.42798 19.2485 5.91296 19.2485 8.97834V11.9777C19.2485 16.7242 15.4007 20.572 10.6542 20.572H4.7511C6.81602 19.6584 8.14779 17.6129 8.14779 15.3549V8.97833Z"
+                                      Fill="#FFFFFF" Opacity="0.88"/>
+                                <!-- Ghost Outer Stroke & Dynamic Accent Glow -->
+                                <Path x:Name="GhostStroke"
+                                      Data="M19.2487 11.9775V8.97851C19.2487 6.009 16.9168 3.58415 13.9843 3.43537L13.6987 3.4279C10.6334 3.4279 8.14812 5.91313 8.14812 8.97851V15.3545L8.14404 15.566C8.06394 17.7396 6.75176 19.687 4.7514 20.572H10.6542L10.8765 20.5693C15.5204 20.4515 19.2487 16.6498 19.2487 11.9775ZM19.9449 11.9775C19.9449 17.1085 15.7852 21.2682 10.6542 21.2682H4.7514C4.42246 21.2682 4.13827 21.0379 4.07015 20.7161C4.00212 20.3942 4.16903 20.068 4.46992 19.9349C6.28268 19.1328 7.45192 17.3368 7.45192 15.3545V8.97851C7.45192 5.52863 10.2489 2.73169 13.6987 2.73169C17.1485 2.73184 19.9449 5.52872 19.9449 8.97851V11.9775Z"
+                                      Fill="#38BDF8">
                                     <Path.Effect>
-                                        <DropShadowEffect BlurRadius="4" ShadowDepth="0" Color="#38BDF8" Opacity="0.8"/>
+                                        <DropShadowEffect x:Name="GhostGlow" BlurRadius="6" ShadowDepth="0" Color="#38BDF8" Opacity="0.8"/>
                                     </Path.Effect>
                                 </Path>
                                 <!-- Eyes -->
-                                <Ellipse Canvas.Left="5.5" Canvas.Top="5" Width="1.8" Height="2" Fill="#0F172A"/>
-                                <Ellipse Canvas.Left="8.7" Canvas.Top="5" Width="1.8" Height="2" Fill="#0F172A"/>
+                                <Path Data="M13.1163 7.70898C13.7329 7.70898 14.2334 8.35251 14.2335 9.14648C14.2335 9.94065 13.733 10.585 13.1163 10.585C12.4998 10.5847 12.0001 9.9405 12.0001 9.14648C12.0003 8.35265 12.4999 7.70922 13.1163 7.70898ZM16.6613 7.70898C17.2778 7.70898 17.7783 8.35249 17.7784 9.14648C17.7784 9.94065 17.2779 10.585 16.6613 10.585C16.0447 10.5847 15.545 9.94051 15.545 9.14648C15.5452 8.35263 16.0448 7.7092 16.6613 7.70898Z"
+                                      Fill="#0F172A" Opacity="0.8"/>
                             </Canvas>
-                        </StackPanel>
+                        </Viewbox>
 
                         <!-- Note Title -->
                         <TextBlock x:Name="TxtTitle" Grid.Column="1" Text="GhostNote" FontSize="11.5" FontWeight="SemiBold"
@@ -132,7 +194,7 @@
                     <RichTextBox x:Name="EditorBox"
                                  Background="Transparent"
                                  BorderThickness="0"
-                                 Padding="10,6,10,10"
+                                 Padding="10,6,10,24"
                                  Foreground="#DD000000"
                                  FontFamily="Segoe UI, -apple-system, system-ui, sans-serif"
                                  FontSize="13.5"
@@ -141,6 +203,53 @@
                                  VerticalScrollBarVisibility="Auto"
                                  HorizontalScrollBarVisibility="Disabled"
                                  TextChanged="OnEditorTextChanged"/>
+
+                    <!-- Bottom Hover Toolbar Trigger Area & Floating Capsule -->
+                    <Border x:Name="BottomHoverArea" VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Height="36"
+                            Background="Transparent" MouseEnter="OnBottomAreaMouseEnter" MouseLeave="OnBottomAreaMouseLeave">
+                        <Border x:Name="HoverToolbar" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,5"
+                                Background="#E81E293B" BorderBrush="#50FFFFFF" BorderThickness="1" CornerRadius="12"
+                                Padding="5,2" Opacity="0">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="8" ShadowDepth="1" Opacity="0.4"/>
+                            </Border.Effect>
+                            <StackPanel Orientation="Horizontal">
+                                <!-- Bold -->
+                                <Button Style="{StaticResource HdrBtn}" Width="22" Height="22" Click="OnToolbarBold" ToolTip="Bold (Ctrl+B)" Margin="1,0">
+                                    <Path Data="{StaticResource IconBold}" Width="9" Height="9" Stroke="#E2E8F0" StrokeThickness="1.6" Stretch="Uniform"/>
+                                </Button>
+                                <!-- Italic -->
+                                <Button Style="{StaticResource HdrBtn}" Width="22" Height="22" Click="OnToolbarItalic" ToolTip="Italic (Ctrl+I)" Margin="1,0">
+                                    <Path Data="{StaticResource IconItalic}" Width="9" Height="9" Stroke="#E2E8F0" StrokeThickness="1.6" Stretch="Uniform"/>
+                                </Button>
+                                <!-- Underline -->
+                                <Button Style="{StaticResource HdrBtn}" Width="22" Height="22" Click="OnToolbarUnderline" ToolTip="Underline (Ctrl+U)" Margin="1,0">
+                                    <TextBlock Text="U" FontWeight="Bold" FontSize="10.5" TextDecorations="Underline" Foreground="#E2E8F0" VerticalAlignment="Center"/>
+                                </Button>
+                                <!-- Strikethrough -->
+                                <Button Style="{StaticResource HdrBtn}" Width="22" Height="22" Click="OnToolbarStrikethrough" ToolTip="Strikethrough" Margin="1,0">
+                                    <Path Data="{StaticResource IconStrikethrough}" Width="9" Height="9" Stroke="#E2E8F0" StrokeThickness="1.6" Stretch="Uniform"/>
+                                </Button>
+                                <Rectangle Width="1" Height="12" Fill="#475569" Margin="3,0"/>
+                                <!-- Bullet List -->
+                                <Button Style="{StaticResource HdrBtn}" Width="22" Height="22" Click="OnToolbarBullets" ToolTip="Bullet List" Margin="1,0">
+                                    <Path Data="{StaticResource IconList}" Width="10" Height="10" Stroke="#E2E8F0" StrokeThickness="1.6" Stretch="Uniform"/>
+                                </Button>
+                                <!-- Numbered List -->
+                                <Button Style="{StaticResource HdrBtn}" Width="22" Height="22" Click="OnToolbarNumbers" ToolTip="Numbered List" Margin="1,0">
+                                    <Path Data="{StaticResource IconListOl}" Width="10" Height="10" Stroke="#E2E8F0" StrokeThickness="1.6" Stretch="Uniform"/>
+                                </Button>
+                                <!-- Task Checkbox -->
+                                <Button Style="{StaticResource HdrBtn}" Width="22" Height="22" Click="OnToolbarTask" ToolTip="Checkbox Task [ ]" Margin="1,0">
+                                    <Path Data="{StaticResource IconCheckSquare}" Width="9" Height="9" Stroke="#E2E8F0" StrokeThickness="1.6" Stretch="Uniform"/>
+                                </Button>
+                                <!-- Code -->
+                                <Button Style="{StaticResource HdrBtn}" Width="22" Height="22" Click="OnToolbarCode" ToolTip="Inline Code (`code`)" Margin="1,0">
+                                    <Path Data="{StaticResource IconCode}" Width="10" Height="10" Stroke="#E2E8F0" StrokeThickness="1.6" Stretch="Uniform"/>
+                                </Button>
+                            </StackPanel>
+                        </Border>
+                    </Border>
                 </Grid>
             </Grid>
         </Border>

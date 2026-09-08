@@ -28,6 +28,9 @@ public partial class NoteWindow : Window
     private bool _isMouseDownOnHeader;
     private bool _isDragging;
     private System.Windows.Point _mouseDownScreenPos;
+    private bool _isPeekState;
+    private double _fullDockLeft;
+    private double _peekDockLeft;
 
     public Note Model { get; }
 
@@ -43,8 +46,8 @@ public partial class NoteWindow : Window
         _guard = guard;
         InitializeComponent();
 
-        Left = note.X;
-        Top = note.Y;
+        Left = note.X > 0 ? note.X : 100;
+        Top = note.Y > 0 ? note.Y : 100;
         Width = note.Width > 0 ? note.Width : 320;
         Height = note.Height > 0 ? note.Height : 220;
 
@@ -94,11 +97,8 @@ public partial class NoteWindow : Window
             Model.Height = Height;
             Model.RestoreWidth = Width;
             Model.RestoreHeight = Height;
-        }
-        else
-        {
-            Model.X = Left;
-            Model.Y = Top;
+            Model.RestoreX = Left;
+            Model.RestoreY = Top;
         }
         GeometryChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -183,6 +183,25 @@ public partial class NoteWindow : Window
         }
     }
 
+    // ── WINDOW HOVER (PEEK / SLIDE FOR MINIMIZED PILL) ──
+    private void OnWindowMouseEnter(object sender, MouseEventArgs e)
+    {
+        if (Model.IsMinimized && _isPeekState && !_isDragging)
+        {
+            Left = _fullDockLeft;
+            _isPeekState = false;
+        }
+    }
+
+    private void OnWindowMouseLeave(object sender, MouseEventArgs e)
+    {
+        if (Model.IsMinimized && !_isPeekState && !_isDragging && !_isMouseDownOnHeader)
+        {
+            Left = _peekDockLeft;
+            _isPeekState = true;
+        }
+    }
+
     private void OnHeaderMouseMove(object sender, MouseEventArgs e)
     {
         if (_isMouseDownOnHeader && e.LeftButton == MouseButtonState.Pressed && !_isDragging)
@@ -195,6 +214,7 @@ public partial class NoteWindow : Window
             if (Math.Sqrt(deltaX * deltaX + deltaY * deltaY) > 4)
             {
                 _isDragging = true;
+                _isPeekState = false;
                 try
                 {
                     DragMove();
@@ -218,7 +238,7 @@ public partial class NoteWindow : Window
             _isMouseDownOnHeader = false;
             if (!_isDragging && Model.IsMinimized)
             {
-                // Clicked without dragging while minimized -> restore note!
+                // Clicked without dragging while minimized -> restore note to where it was last minimized!
                 SetMinimized(false);
             }
         }
@@ -240,10 +260,18 @@ public partial class NoteWindow : Window
 
             var bounds = screen.WorkingArea;
 
-            // Snap to left edge
-            if (Math.Abs(Left - bounds.Left) < 40) Left = bounds.Left + 6;
-            // Snap to right edge
-            else if (Math.Abs((Left + Width) - bounds.Right) < 40) Left = bounds.Right - Width - 6;
+            if (Math.Abs(Left - bounds.Left) < 50)
+            {
+                _fullDockLeft = bounds.Left + 6;
+                _peekDockLeft = bounds.Left - Width + 75;
+                Left = _isPeekState ? _peekDockLeft : _fullDockLeft;
+            }
+            else if (Math.Abs((Left + Width) - bounds.Right) < 50)
+            {
+                _fullDockLeft = bounds.Right - Width - 6;
+                _peekDockLeft = bounds.Right - 75;
+                Left = _isPeekState ? _peekDockLeft : _fullDockLeft;
+            }
 
             // Snap to top edge
             if (Math.Abs(Top - bounds.Top) < 40) Top = bounds.Top + 6;
@@ -251,13 +279,12 @@ public partial class NoteWindow : Window
             else if (Math.Abs((Top + Height) - bounds.Bottom) < 40) Top = bounds.Bottom - Height - 6;
 
             // Keep within working bounds
-            Left = Math.Clamp(Left, bounds.Left, bounds.Right - Width);
             Top = Math.Clamp(Top, bounds.Top, bounds.Bottom - Height);
         }
         catch { }
     }
 
-    private void DockToActiveMonitorRightEdge()
+    private void DockToActiveMonitorRightEdge(bool peek = true)
     {
         try
         {
@@ -267,7 +294,11 @@ public partial class NoteWindow : Window
                 : System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)Left, (int)Top));
 
             var bounds = screen.WorkingArea;
-            Left = bounds.Right - Width - 8;
+            _fullDockLeft = bounds.Right - Width - 6;
+            _peekDockLeft = bounds.Right - 75;
+
+            Left = peek ? _peekDockLeft : _fullDockLeft;
+            _isPeekState = peek;
             Top = Math.Clamp(Top, bounds.Top + 10, bounds.Bottom - Height - 10);
         }
         catch { }
@@ -298,6 +329,8 @@ public partial class NoteWindow : Window
             SettingsFlyout.Visibility = Visibility.Collapsed;
             if (Width > 200) Model.RestoreWidth = Width;
             if (Height > 60) Model.RestoreHeight = Height;
+            Model.RestoreX = Left;
+            Model.RestoreY = Top;
 
             BodyRow.Height = new GridLength(0);
             Width = 180;
@@ -307,18 +340,21 @@ public partial class NoteWindow : Window
             PillControls.Visibility = Visibility.Visible;
             ResizeGrips.Visibility = Visibility.Collapsed;
 
-            // Dock to right edge of current monitor
-            DockToActiveMonitorRightEdge();
+            // Dock to right edge in half-peek state
+            DockToActiveMonitorRightEdge(peek: true);
         }
         else
         {
             BodyRow.Height = new GridLength(1, GridUnitType.Star);
             Width = Model.RestoreWidth > 180 ? Model.RestoreWidth : 320;
             Height = Model.RestoreHeight > 100 ? Model.RestoreHeight : 220;
+            Left = Model.RestoreX > 0 ? Model.RestoreX : Left;
+            Top = Model.RestoreY > 0 ? Model.RestoreY : Top;
             HeaderBorder.CornerRadius = new CornerRadius(11, 11, 0, 0);
             HeaderButtons.Visibility = Visibility.Visible;
             PillControls.Visibility = Visibility.Collapsed;
             ResizeGrips.Visibility = Visibility.Visible;
+            _isPeekState = false;
 
             ClampToActiveMonitor();
         }
@@ -463,6 +499,117 @@ public partial class NoteWindow : Window
             range.ApplyPropertyValue(TextElement.ForegroundProperty, fontBrush);
         }
         catch { }
+
+        // Dynamic Accent Color for Ghost Logo from Note Tint
+        Color accentColor = (Model.Tint ?? "").ToUpperInvariant() switch
+        {
+            "#FFF59D" => Color.FromRgb(245, 158, 11),  // Amber
+            "#BBDEFB" => Color.FromRgb(2, 132, 199),   // Sky
+            "#C8E6C9" => Color.FromRgb(16, 185, 129),  // Emerald
+            "#F8BBD0" => Color.FromRgb(236, 72, 153),  // Rose
+            "#D1C4E9" => Color.FromRgb(139, 92, 246),  // Violet
+            _ => Color.FromRgb(56, 189, 248)           // Cyan
+        };
+
+        if (GhostStroke != null)
+        {
+            GhostStroke.Fill = new SolidColorBrush(accentColor);
+        }
+        if (GhostGlow != null)
+        {
+            GhostGlow.Color = accentColor;
+        }
+    }
+
+    // ── BOTTOM HOVER TOOLBAR ──
+    private void OnBottomAreaMouseEnter(object sender, MouseEventArgs e)
+    {
+        if (!Model.IsMinimized && HoverToolbar != null)
+        {
+            HoverToolbar.BeginAnimation(UIElement.OpacityProperty,
+                new System.Windows.Media.Animation.DoubleAnimation(1.0, TimeSpan.FromMilliseconds(150)));
+        }
+    }
+
+    private void OnBottomAreaMouseLeave(object sender, MouseEventArgs e)
+    {
+        if (HoverToolbar != null)
+        {
+            HoverToolbar.BeginAnimation(UIElement.OpacityProperty,
+                new System.Windows.Media.Animation.DoubleAnimation(0.0, TimeSpan.FromMilliseconds(200)));
+        }
+    }
+
+    private void OnToolbarBold(object sender, RoutedEventArgs e)
+    {
+        EditingCommands.ToggleBold.Execute(null, EditorBox);
+        EditorBox.Focus();
+    }
+
+    private void OnToolbarItalic(object sender, RoutedEventArgs e)
+    {
+        EditingCommands.ToggleItalic.Execute(null, EditorBox);
+        EditorBox.Focus();
+    }
+
+    private void OnToolbarUnderline(object sender, RoutedEventArgs e)
+    {
+        EditingCommands.ToggleUnderline.Execute(null, EditorBox);
+        EditorBox.Focus();
+    }
+
+    private void OnToolbarStrikethrough(object sender, RoutedEventArgs e)
+    {
+        var sel = EditorBox.Selection;
+        if (!sel.IsEmpty)
+        {
+            var cur = sel.GetPropertyValue(Inline.TextDecorationsProperty);
+            if (cur == TextDecorations.Strikethrough)
+                sel.ApplyPropertyValue(Inline.TextDecorationsProperty, null);
+            else
+                sel.ApplyPropertyValue(Inline.TextDecorationsProperty, TextDecorations.Strikethrough);
+        }
+        EditorBox.Focus();
+    }
+
+    private void OnToolbarBullets(object sender, RoutedEventArgs e)
+    {
+        EditingCommands.ToggleBullets.Execute(null, EditorBox);
+        EditorBox.Focus();
+    }
+
+    private void OnToolbarNumbers(object sender, RoutedEventArgs e)
+    {
+        EditingCommands.ToggleNumbering.Execute(null, EditorBox);
+        EditorBox.Focus();
+    }
+
+    private void OnToolbarTask(object sender, RoutedEventArgs e)
+    {
+        var sel = EditorBox.Selection;
+        if (sel.IsEmpty)
+        {
+            sel.Text = "- [ ] ";
+        }
+        else
+        {
+            sel.Text = "- [ ] " + sel.Text;
+        }
+        EditorBox.Focus();
+    }
+
+    private void OnToolbarCode(object sender, RoutedEventArgs e)
+    {
+        var sel = EditorBox.Selection;
+        if (!sel.IsEmpty)
+        {
+            sel.Text = "`" + sel.Text + "`";
+        }
+        else
+        {
+            sel.Text = "`code`";
+        }
+        EditorBox.Focus();
     }
 
     // ── RESIZE ──

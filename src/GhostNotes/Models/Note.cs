@@ -21,6 +21,8 @@ public sealed class Note
     public bool IsMinimized { get; set; } = false;
     public double RestoreWidth { get; set; } = 320;
     public double RestoreHeight { get; set; } = 220;
+    public double RestoreX { get; set; } = 100;
+    public double RestoreY { get; set; } = 100;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
