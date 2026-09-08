@@ -64,13 +64,39 @@ public sealed class NoteManager : IDisposable
             }
         }
 
-        // If no notes exist or all are closed, auto-spawn 1 fresh note (Option A)
+        // If all notes were closed, restore the most recent note with user content instead of losing content
         if (restoredCount == 0)
         {
-            CreateNote();
+            var noteToRestore = _notes
+                .Where(n => !IsDefaultTemplate(n.Markdown))
+                .OrderByDescending(n => n.UpdatedAt)
+                .FirstOrDefault()
+                ?? _notes.OrderByDescending(n => n.UpdatedAt).FirstOrDefault();
+
+            if (noteToRestore != null)
+            {
+                noteToRestore.IsClosed = false;
+                _repo.Save(noteToRestore);
+                Attach(new NoteWindow(noteToRestore, _guard));
+            }
+            else
+            {
+                CreateNote();
+            }
         }
 
         NotesStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public static bool IsDefaultTemplate(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return true;
+        var trimmed = text.Trim();
+        if (trimmed == "# Quick Note") return true;
+        if (trimmed == "# Quick Note\n\nStart typing here..." || trimmed == "# Quick Note\r\n\r\nStart typing here...") return true;
+        if (trimmed.StartsWith("# Quick Note") && (trimmed.Contains("Start typing here...") || trimmed.Contains("Type markdown directly here")))
+            return true;
+        return false;
     }
 
     public NoteWindow CreateNote()
@@ -100,6 +126,11 @@ public sealed class NoteManager : IDisposable
 
     public void CloseNote(NoteWindow window)
     {
+        window.FlushEditorToModel();
+        if (_schedulers.TryGetValue(window.Model.Id, out var scheduler))
+        {
+            scheduler.FlushNow();
+        }
         window.Model.IsClosed = true;
         _repo.Save(window.Model);
 

@@ -8,7 +8,7 @@
         ShowInTaskbar="False"
         ResizeMode="NoResize"
         MinWidth="140"
-        MinHeight="34"
+        MinHeight="48"
         MouseEnter="OnWindowMouseEnter"
         MouseLeave="OnWindowMouseLeave"
         Title="GhostNote">
@@ -110,9 +110,9 @@
 
     <Grid x:Name="RootGrid">
         <!-- Main Note Glass Container -->
-        <Border x:Name="Glass" CornerRadius="12" BorderBrush="#60FFFFFF" BorderThickness="1">
+        <Border x:Name="Glass" CornerRadius="12" BorderBrush="#60FFFFFF" BorderThickness="1" Margin="8">
             <Border.Effect>
-                <DropShadowEffect BlurRadius="16" ShadowDepth="2" Opacity="0.30"/>
+                <DropShadowEffect BlurRadius="5" ShadowDepth="1" Opacity="0.20"/>
             </Border.Effect>
             <Grid>
                 <Grid.RowDefinitions>

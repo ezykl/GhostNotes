@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls.Primitives;
@@ -125,7 +126,20 @@ public partial class App : Application
                         {
                             if (manager.Windows.Count == 0)
                             {
-                                manager.CreateNote();
+                                var noteToRestore = manager.Notes
+                                    .Where(n => !NoteManager.IsDefaultTemplate(n.Markdown))
+                                    .OrderByDescending(n => n.UpdatedAt)
+                                    .FirstOrDefault()
+                                    ?? manager.Notes.OrderByDescending(n => n.UpdatedAt).FirstOrDefault();
+
+                                if (noteToRestore != null)
+                                {
+                                    manager.ReopenNote(noteToRestore);
+                                }
+                                else
+                                {
+                                    manager.CreateNote();
+                                }
                             }
                             else
                             {

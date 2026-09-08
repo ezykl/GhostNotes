@@ -77,4 +77,26 @@ public sealed class NoteRepositoryTests : IDisposable
     {
         if (Directory.Exists(_dir)) Directory.Delete(_dir, true);
     }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("# Quick Note")]
+    [InlineData("# Quick Note\n\nStart typing here...")]
+    [InlineData("# Quick Note\r\n\r\nStart typing here...")]
+    public void IsDefaultTemplate_ReturnsTrue_ForTemplateStrings(string? text)
+    {
+        Assert.True(GhostNotes.NoteManager.IsDefaultTemplate(text));
+    }
+
+    [Theory]
+    [InlineData("My grocery list:\n- Milk\n- Eggs")]
+    [InlineData("# Meeting Notes\nDiscussed Q3 release")]
+    [InlineData("asdascasv\nvasvasd")]
+    [InlineData("Hello world")]
+    public void IsDefaultTemplate_ReturnsFalse_ForUserContent(string text)
+    {
+        Assert.False(GhostNotes.NoteManager.IsDefaultTemplate(text));
+    }
 }

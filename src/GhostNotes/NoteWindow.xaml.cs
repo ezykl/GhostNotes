@@ -334,7 +334,7 @@ public partial class NoteWindow : Window
 
             BodyRow.Height = new GridLength(0);
             Width = 180;
-            Height = 34;
+            Height = 48;
             HeaderBorder.CornerRadius = new CornerRadius(11);
             HeaderButtons.Visibility = Visibility.Collapsed;
             PillControls.Visibility = Visibility.Visible;
@@ -371,8 +371,19 @@ public partial class NoteWindow : Window
         NewNoteRequested?.Invoke(this, EventArgs.Empty);
     }
 
+    public void FlushEditorToModel()
+    {
+        if (Model is null) return;
+        var range = new TextRange(EditorBox.Document.ContentStart, EditorBox.Document.ContentEnd);
+        var text = range.Text.TrimEnd();
+        Model.Markdown = text;
+        Model.Rtf = text;
+        TxtTitle.Text = Model.Title;
+    }
+
     private void OnCloseClicked(object sender, RoutedEventArgs e)
     {
+        FlushEditorToModel();
         CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 
