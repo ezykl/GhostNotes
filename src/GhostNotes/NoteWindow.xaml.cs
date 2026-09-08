@@ -37,9 +37,9 @@ public partial class NoteWindow : Window
 
     public NoteWindow(Note note, CaptureGuard guard)
     {
-        InitializeComponent();
         Model = note;
         _guard = guard;
+        InitializeComponent();
         Left = note.X;
         Top = note.Y;
         Width = note.Width;
@@ -74,6 +74,7 @@ public partial class NoteWindow : Window
 
     private void SyncGeometry()
     {
+        if (Model is null) return;
         Model.X = Left;
         Model.Y = Top;
         Model.Width = Width;
@@ -216,6 +217,7 @@ public partial class NoteWindow : Window
 
     private void OnTextColorSelected(object sender, SelectionChangedEventArgs e)
     {
+        if (Model is null || Body is null || TextColors is null) return;
         if (TextColors.SelectedItem is ComboBoxItem item && item.Tag is string hex)
         {
             Body.Selection.ApplyPropertyValue(TextElement.ForegroundProperty, BrushFrom(hex));
@@ -226,6 +228,7 @@ public partial class NoteWindow : Window
 
     private void OnTintSelected(object sender, SelectionChangedEventArgs e)
     {
+        if (Model is null || Glass is null || Tints is null) return;
         if (Tints.SelectedItem is ComboBoxItem item && item.Tag is string hex)
         {
             Model.Tint = hex;
