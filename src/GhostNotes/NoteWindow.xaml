@@ -155,7 +155,7 @@
 
                             <!-- Color Tint Swatches -->
                             <TextBlock Text="Color Tint" FontSize="10.5" FontWeight="Medium" Foreground="#94A3B8" Margin="0,0,0,6"/>
-                            <WrapPanel x:Name="TintWrapPanel" Margin="0,0,0,10">
+                            <WrapPanel x:Name="TintWrapPanel" Margin="0,0,0,8">
                                 <Border Width="20" Height="20" Background="#FFF59D" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
                                         BorderBrush="#38BDF8" BorderThickness="2" MouseLeftButtonDown="OnSelectTint" Tag="#FFF59D" ToolTip="Yellow"/>
                                 <Border Width="20" Height="20" Background="#BBDEFB" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
@@ -170,12 +170,29 @@
                                         BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectTint" Tag="#FFFFFF" ToolTip="White"/>
                             </WrapPanel>
 
-                            <!-- Opacity Slider -->
+                            <!-- Font Color Swatches -->
+                            <TextBlock Text="Font Color" FontSize="10.5" FontWeight="Medium" Foreground="#94A3B8" Margin="0,0,0,6"/>
+                            <WrapPanel x:Name="FontColorWrapPanel" Margin="0,0,0,10">
+                                <Border Width="20" Height="20" Background="#1E293B" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
+                                        BorderBrush="#38BDF8" BorderThickness="2" MouseLeftButtonDown="OnSelectFontColor" Tag="#1E293B" ToolTip="Black / Charcoal"/>
+                                <Border Width="20" Height="20" Background="#FFFFFF" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
+                                        BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectFontColor" Tag="#FFFFFF" ToolTip="White"/>
+                                <Border Width="20" Height="20" Background="#DC2626" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
+                                        BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectFontColor" Tag="#DC2626" ToolTip="Crimson Red"/>
+                                <Border Width="20" Height="20" Background="#0284C7" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
+                                        BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectFontColor" Tag="#0284C7" ToolTip="Ocean Blue"/>
+                                <Border Width="20" Height="20" Background="#059669" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
+                                        BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectFontColor" Tag="#059669" ToolTip="Emerald Green"/>
+                                <Border Width="20" Height="20" Background="#7C3AED" CornerRadius="4" Margin="0,0,5,5" Cursor="Hand"
+                                        BorderBrush="Transparent" BorderThickness="2" MouseLeftButtonDown="OnSelectFontColor" Tag="#7C3AED" ToolTip="Royal Purple"/>
+                            </WrapPanel>
+
+                            <!-- Note Opacity Slider -->
                             <Grid Margin="0,0,0,2">
-                                <TextBlock Text="Glass Opacity" FontSize="10.5" FontWeight="Medium" Foreground="#94A3B8"/>
+                                <TextBlock Text="Note Opacity" FontSize="10.5" FontWeight="Medium" Foreground="#94A3B8"/>
                                 <TextBlock x:Name="TxtOpacityVal" Text="85%" FontSize="10" Foreground="#64748B" HorizontalAlignment="Right"/>
                             </Grid>
-                            <Slider x:Name="SliderOpacity" Minimum="0.3" Maximum="1.0" Value="0.85" SmallChange="0.05" LargeChange="0.1"
+                            <Slider x:Name="SliderOpacity" Minimum="0.2" Maximum="1.0" Value="0.85" SmallChange="0.05" LargeChange="0.1"
                                     ValueChanged="OnOpacityValueChanged" Margin="0,0,0,10"/>
 
                             <!-- Font Size -->

@@ -13,6 +13,7 @@ public sealed class Note
     public double Width { get; set; } = 320;
     public double Height { get; set; } = 220;
     public string Tint { get; set; } = "#FFF59D";
+    public string FontColor { get; set; } = "#1E293B";
     public double Opacity { get; set; } = 0.85;
     public int FontSize { get; set; } = 14;
     public bool IsDeployed { get; set; } = true;

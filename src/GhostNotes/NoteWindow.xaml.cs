@@ -279,6 +279,7 @@ public partial class NoteWindow : Window
             SliderFontSize.Value = Model.FontSize;
             TxtFontSizeVal.Text = $"{Model.FontSize}pt";
             HighlightSelectedTint(Model.Tint);
+            HighlightSelectedFontColor(Model.FontColor ?? "#1E293B");
             SettingsFlyout.Visibility = Visibility.Visible;
         }
     }
@@ -312,12 +313,35 @@ public partial class NoteWindow : Window
         }
     }
 
+    private void OnSelectFontColor(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is Border b && b.Tag is string hex)
+        {
+            Model.FontColor = hex;
+            HighlightSelectedFontColor(hex);
+            ApplyGlassBackground();
+            ModelChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private void HighlightSelectedFontColor(string hex)
+    {
+        foreach (var child in FontColorWrapPanel.Children)
+        {
+            if (child is Border b)
+            {
+                bool isSelected = string.Equals(b.Tag as string, hex, StringComparison.OrdinalIgnoreCase);
+                b.BorderBrush = isSelected ? new SolidColorBrush(Color.FromRgb(56, 189, 248)) : Brushes.Transparent;
+            }
+        }
+    }
+
     private void OnOpacityValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (Model is null) return;
         Model.Opacity = Math.Round(e.NewValue, 2);
+        this.Opacity = Model.Opacity;
         if (TxtOpacityVal != null) TxtOpacityVal.Text = $"{(int)(Model.Opacity * 100)}%";
-        ApplyGlassBackground();
         ModelChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -347,9 +371,23 @@ public partial class NoteWindow : Window
     // ── GLASS & ACRYLIC ──
     public void ApplyGlassBackground()
     {
+        // Change window opacity directly for smooth, natural window transparency
+        this.Opacity = Math.Clamp(Model.Opacity, 0.2, 1.0);
+
         var color = (Color)ColorConverter.ConvertFromString(Model.Tint);
-        byte alpha = (byte)Math.Clamp(Math.Round(Model.Opacity * 255), 140, 255);
-        Glass.Background = new SolidColorBrush(Color.FromArgb(alpha, color.R, color.G, color.B));
+        Glass.Background = new SolidColorBrush(color);
+
+        var fontHex = string.IsNullOrWhiteSpace(Model.FontColor) ? "#1E293B" : Model.FontColor;
+        var fontColor = (Color)ColorConverter.ConvertFromString(fontHex);
+        var fontBrush = new SolidColorBrush(fontColor);
+
+        EditorBox.Foreground = fontBrush;
+        try
+        {
+            var range = new TextRange(EditorBox.Document.ContentStart, EditorBox.Document.ContentEnd);
+            range.ApplyPropertyValue(TextElement.ForegroundProperty, fontBrush);
+        }
+        catch { }
     }
 
     private void RefreshAcrylic()
