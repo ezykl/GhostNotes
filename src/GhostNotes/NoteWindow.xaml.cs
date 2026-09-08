@@ -113,14 +113,7 @@ public partial class NoteWindow : Window
                 ? Model.Markdown
                 : (!string.IsNullOrWhiteSpace(Model.Rtf) && !Model.Rtf.StartsWith("{\\rtf") ? Model.Rtf : "");
 
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                range.Text = "# Quick Note\n\nStart typing here...";
-            }
-            else
-            {
-                range.Text = text;
-            }
+            range.Text = text ?? "";
 
             EditorBox.FontSize = Math.Clamp(Model.FontSize, 10, 28);
             TxtTitle.Text = Model.Title;

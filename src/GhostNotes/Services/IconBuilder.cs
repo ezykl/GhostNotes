@@ -1,16 +1,19 @@
 using System;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Threading;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using Point = System.Windows.Point;
 
 namespace GhostNotes.Services;
 
 public static class IconBuilder
 {
-    public static void EnsureIcon(string outputPath)
+    public static void EnsureIcon(string outputPath, bool force = false)
     {
-        if (File.Exists(outputPath)) return;
+        if (File.Exists(outputPath) && !force) return;
 
         var dir = Path.GetDirectoryName(outputPath);
         if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
@@ -61,97 +64,54 @@ public static class IconBuilder
 
     public static Bitmap RenderGhostLogo(int size)
     {
-        var bmp = new Bitmap(size, size, PixelFormat.Format32bppArgb);
-        using var g = Graphics.FromImage(bmp);
-        g.SmoothingMode = SmoothingMode.HighQuality;
-        g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-        g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-        g.Clear(Color.Transparent);
-
-        float s = size / 512f;
-
-        // Document background with folded corner
-        using (var docPath = new GraphicsPath())
+        if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
         {
-            float l = 104 * s, t = 76 * s, r = 408 * s, b = 424 * s, f = 64 * s;
-            float rad = 28 * s;
-            docPath.AddArc(l, t, rad * 2, rad * 2, 180, 90);
-            docPath.AddArc(r - rad * 2, t, rad * 2, rad * 2, 270, 90);
-            docPath.AddLine(r, t + rad, r, b - f);
-            docPath.AddLine(r - f, b, l + rad, b);
-            docPath.AddArc(l, b - rad * 2, rad * 2, rad * 2, 90, 90);
-            docPath.CloseFigure();
-
-            using var brush = new LinearGradientBrush(
-                new PointF(l, t), new PointF(r, b),
-                Color.FromArgb(235, 56, 189, 248),
-                Color.FromArgb(215, 14, 165, 233));
-            g.FillPath(brush, docPath);
-
-            using var pen = new Pen(Color.FromArgb(255, 186, 230, 253), Math.Max(1.5f, 5f * s));
-            g.DrawPath(pen, docPath);
+            return RenderGhostLogoSta(size);
         }
 
-        // Folded tab corner
-        using (var foldPath = new GraphicsPath())
+        Bitmap? bmp = null;
+        var t = new Thread(() => { bmp = RenderGhostLogoSta(size); });
+        t.SetApartmentState(ApartmentState.STA);
+        t.Start();
+        t.Join();
+        return bmp ?? new Bitmap(size, size);
+    }
+
+    private static Bitmap RenderGhostLogoSta(int size)
+    {
+        var visual = new DrawingVisual();
+        using (var dc = visual.RenderOpen())
         {
-            float r = 408 * s, b = 424 * s, f = 64 * s;
-            foldPath.AddLine(r - f, b, r - f, b - f);
-            foldPath.AddLine(r - f, b - f, r, b - f);
-            foldPath.CloseFigure();
-            using var foldBrush = new SolidBrush(Color.FromArgb(245, 125, 211, 252));
-            g.FillPath(foldBrush, foldPath);
+            double scale = size / 26.0;
+            dc.PushTransform(new ScaleTransform(scale, scale));
+
+            var geoBody = Geometry.Parse("M8.14779 8.97833C8.14779 5.91296 10.6328 3.42798 13.6981 3.42798C16.7635 3.42798 19.2485 5.91296 19.2485 8.97834V11.9777C19.2485 16.7242 15.4007 20.572 10.6542 20.572H4.7511C6.81602 19.6584 8.14779 17.6129 8.14779 15.3549V8.97833Z");
+            var geoStroke = Geometry.Parse("M19.2487 11.9775V8.97851C19.2487 6.009 16.9168 3.58415 13.9843 3.43537L13.6987 3.4279C10.6334 3.4279 8.14812 5.91313 8.14812 8.97851V15.3545L8.14404 15.566C8.06394 17.7396 6.75176 19.687 4.7514 20.572H10.6542L10.8765 20.5693C15.5204 20.4515 19.2487 16.6498 19.2487 11.9775ZM19.9449 11.9775C19.9449 17.1085 15.7852 21.2682 10.6542 21.2682H4.7514C4.42246 21.2682 4.13827 21.0379 4.07015 20.7161C4.00212 20.3942 4.16903 20.068 4.46992 19.9349C6.28268 19.1328 7.45192 17.3368 7.45192 15.3545V8.97851C7.45192 5.52863 10.2489 2.73169 13.6987 2.73169C17.1485 2.73184 19.9449 5.52872 19.9449 8.97851V11.9775Z");
+            var geoEyes = Geometry.Parse("M13.1163 7.70898C13.7329 7.70898 14.2334 8.35251 14.2335 9.14648C14.2335 9.94065 13.733 10.585 13.1163 10.585C12.4998 10.5847 12.0001 9.9405 12.0001 9.14648C12.0003 8.35265 12.4999 7.70922 13.1163 7.70898ZM16.6613 7.70898C17.2778 7.70898 17.7783 8.35249 17.7784 9.14648C17.7784 9.94065 17.2779 10.585 16.6613 10.585C16.0447 10.5847 15.545 9.94051 15.545 9.14648C15.5452 8.35263 16.0448 7.7092 16.6613 7.70898Z");
+
+            var bodyBrush = new LinearGradientBrush(
+                System.Windows.Media.Color.FromArgb(245, 255, 255, 255),
+                System.Windows.Media.Color.FromArgb(210, 96, 96, 96),
+                new Point(0.5, 0.1),
+                new Point(0.5, 0.9));
+
+            var strokeBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248));
+            var eyesBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(210, 15, 23, 42));
+
+            dc.DrawGeometry(bodyBrush, null, geoBody);
+            dc.DrawGeometry(strokeBrush, null, geoStroke);
+            dc.DrawGeometry(eyesBrush, null, geoEyes);
+            dc.Pop();
         }
 
-        // Ghost body
-        using (var ghostPath = new GraphicsPath())
-        {
-            float cx = 256 * s, cy = 205 * s;
-            float gw = 190 * s, gh = 210 * s;
-            ghostPath.AddArc(cx - gw / 2, cy - gh / 2, gw, gh * 0.75f, 180, 180);
-            
-            // Wavy bottom
-            float botY = cy + gh * 0.45f;
-            float leftX = cx - gw / 2;
-            float rightX = cx + gw / 2;
-            ghostPath.AddLine(rightX, cy - gh * 0.1f, rightX, botY);
-            
-            float waveW = gw / 4f;
-            ghostPath.AddBezier(rightX, botY, rightX - waveW * 0.5f, botY + 18 * s, rightX - waveW, botY, rightX - waveW, botY);
-            ghostPath.AddBezier(rightX - waveW, botY, rightX - waveW * 1.5f, botY - 14 * s, rightX - waveW * 2, botY, rightX - waveW * 2, botY);
-            ghostPath.AddBezier(rightX - waveW * 2, botY, rightX - waveW * 2.5f, botY + 18 * s, rightX - waveW * 3, botY, rightX - waveW * 3, botY);
-            ghostPath.AddBezier(rightX - waveW * 3, botY, rightX - waveW * 3.5f, botY - 14 * s, leftX, botY, leftX, botY);
-            ghostPath.CloseFigure();
+        var rtb = new RenderTargetBitmap(size, size, 96, 96, PixelFormats.Pbgra32);
+        rtb.Render(visual);
 
-            using var ghostBrush = new LinearGradientBrush(
-                new PointF(cx, cy - gh / 2), new PointF(cx, botY),
-                Color.FromArgb(250, 255, 255, 255),
-                Color.FromArgb(225, 224, 242, 254));
-            g.FillPath(ghostBrush, ghostPath);
-
-            using var ghostPen = new Pen(Color.FromArgb(240, 186, 230, 253), Math.Max(1.2f, 3.5f * s));
-            g.DrawPath(ghostPen, ghostPath);
-
-            // Ghost cute eyes
-            float eyeR = Math.Max(2f, 12f * s);
-            float eyeY = cy - 25 * s;
-            using var eyeBrush = new SolidBrush(Color.FromArgb(240, 15, 23, 42));
-            g.FillEllipse(eyeBrush, cx - 35 * s - eyeR, eyeY - eyeR, eyeR * 2, eyeR * 2);
-            g.FillEllipse(eyeBrush, cx + 35 * s - eyeR, eyeY - eyeR, eyeR * 2, eyeR * 2);
-
-            // Eye highlights
-            float hlR = Math.Max(0.8f, 4f * s);
-            using var hlBrush = new SolidBrush(Color.White);
-            g.FillEllipse(hlBrush, cx - 33 * s, eyeY - eyeR + 2 * s, hlR * 2, hlR * 2);
-            g.FillEllipse(hlBrush, cx + 37 * s, eyeY - eyeR + 2 * s, hlR * 2, hlR * 2);
-
-            // Cute smile
-            using var smilePen = new Pen(Color.FromArgb(230, 15, 23, 42), Math.Max(1.2f, 3.5f * s));
-            smilePen.StartCap = LineCap.Round;
-            smilePen.EndCap = LineCap.Round;
-            g.DrawArc(smilePen, cx - 18 * s, eyeY + 4 * s, 36 * s, 24 * s, 25, 130);
-        }
-
-        return bmp;
+        var enc = new PngBitmapEncoder();
+        enc.Frames.Add(BitmapFrame.Create(rtb));
+        using var ms = new MemoryStream();
+        enc.Save(ms);
+        ms.Position = 0;
+        return new Bitmap(ms);
     }
 }

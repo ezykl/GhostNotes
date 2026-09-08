@@ -91,12 +91,15 @@ public sealed class NoteManager : IDisposable
     public static bool IsDefaultTemplate(string? text)
     {
         if (string.IsNullOrWhiteSpace(text)) return true;
-        var trimmed = text.Trim();
-        if (trimmed == "# Quick Note") return true;
-        if (trimmed == "# Quick Note\n\nStart typing here..." || trimmed == "# Quick Note\r\n\r\nStart typing here...") return true;
-        if (trimmed.StartsWith("# Quick Note") && (trimmed.Contains("Start typing here...") || trimmed.Contains("Type markdown directly here")))
-            return true;
-        return false;
+        var lines = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        var nonTemplateLines = lines.Where(l =>
+            !l.Equals("# Quick Note", StringComparison.OrdinalIgnoreCase) &&
+            !l.Equals("Start typing here...", StringComparison.OrdinalIgnoreCase) &&
+            !l.Equals("- Type markdown directly here", StringComparison.OrdinalIgnoreCase) &&
+            !l.Equals("- Minimized notes stick to screen edges", StringComparison.OrdinalIgnoreCase) &&
+            !l.Equals("- OBS & screen capture cannot see this!", StringComparison.OrdinalIgnoreCase)
+        );
+        return !nonTemplateLines.Any();
     }
 
     public NoteWindow CreateNote()
@@ -107,7 +110,7 @@ public sealed class NoteManager : IDisposable
             Y = _nextCascade.Y,
             Width = 320,
             Height = 220,
-            Markdown = "# Quick Note\n\n- Type markdown directly here\n- Minimized notes stick to screen edges\n- OBS & screen capture cannot see this!",
+            Markdown = "",
             IsClosed = false,
             IsMinimized = false
         };

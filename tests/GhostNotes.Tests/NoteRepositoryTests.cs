@@ -95,8 +95,21 @@ public sealed class NoteRepositoryTests : IDisposable
     [InlineData("# Meeting Notes\nDiscussed Q3 release")]
     [InlineData("asdascasv\nvasvasd")]
     [InlineData("Hello world")]
+    [InlineData("# Quick Note\nasdasdasdsaasdasdascasdf\nStart typing here...")]
+    [InlineData("# Quick Note\r\nvsdvsdvsd\r\nStart typing here...")]
     public void IsDefaultTemplate_ReturnsFalse_ForUserContent(string text)
     {
         Assert.False(GhostNotes.NoteManager.IsDefaultTemplate(text));
+    }
+
+    [Fact]
+    public void IconBuilder_GeneratesNewIcoFromSvg()
+    {
+        var repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var icoPath = Path.Combine(repoRoot, "src", "GhostNotes", "Assets", "GhostNotes.ico");
+        GhostNotes.Services.IconBuilder.EnsureIcon(icoPath, force: true);
+        Assert.True(File.Exists(icoPath));
+        var info = new FileInfo(icoPath);
+        Assert.True(info.Length > 1000);
     }
 }
