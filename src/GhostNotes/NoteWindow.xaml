@@ -28,52 +28,46 @@
             </Border.Effect>
             <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="26"/>
-                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="28"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                <Border x:Name="DragStrip" Grid.Row="0" Cursor="SizeAll" CornerRadius="12,12,0,0"
-                        MouseLeftButtonDown="OnDragStripDown"/>
-                <ToolBarTray Grid.Row="1" IsLocked="True" Background="Transparent">
-                    <ToolBar Band="0" BandIndex="0" Background="Transparent">
-                        <ToggleButton x:Name="BtnBold" Content="B" FontWeight="Bold"
-                                      Click="OnToggleBold"/>
-                        <ToggleButton x:Name="BtnItalic" Content="I" FontStyle="Italic"
-                                      Click="OnToggleItalic"/>
-                        <ToggleButton x:Name="BtnUnderline" Click="OnToggleUnderline">
-                            <TextBlock Text="U" TextDecorations="Underline"/>
-                        </ToggleButton>
-                        <Separator/>
-                        <ComboBox x:Name="TextColors" Width="70" ToolTip="Text color"
-                                  SelectionChanged="OnTextColorSelected">
-                            <ComboBoxItem Content="Black" Tag="#DD000000" IsSelected="True"/>
-                            <ComboBoxItem Content="White" Tag="#FFFFFFFF"/>
-                            <ComboBoxItem Content="Red" Tag="#DDCC0000"/>
-                            <ComboBoxItem Content="Blue" Tag="#DD1A5FB4"/>
-                            <ComboBoxItem Content="Green" Tag="#DD2E7D32"/>
-                        </ComboBox>
-                        <ComboBox x:Name="Tints" Width="80" ToolTip="Note color"
-                                  SelectionChanged="OnTintSelected">
-                            <ComboBoxItem Content="Yellow" Tag="#FFF59D" IsSelected="True"/>
-                            <ComboBoxItem Content="Blue" Tag="#BBDEFB"/>
-                            <ComboBoxItem Content="Green" Tag="#C8E6C9"/>
-                            <ComboBoxItem Content="Pink" Tag="#F8BBD0"/>
-                            <ComboBoxItem Content="Purple" Tag="#D1C4E9"/>
-                            <ComboBoxItem Content="White" Tag="#FFFFFF"/>
-                        </ComboBox>
-                    </ToolBar>
-                </ToolBarTray>
-                <RichTextBox x:Name="Body" Grid.Row="2"
-                             AcceptsReturn="True"
-                             AcceptsTab="True"
-                             Background="Transparent"
-                             BorderThickness="0"
-                             Padding="8,4,8,8"
-                             HorizontalScrollBarVisibility="Hidden"
-                             VerticalScrollBarVisibility="Auto"
-                             TextChanged="OnBodyTextChanged"/>
+                
+                <!-- Modern Overlay Drag Strip -->
+                <Grid x:Name="DragStrip" Grid.Row="0" Cursor="SizeAll" Background="#15000000"
+                      MouseLeftButtonDown="OnDragStripDown">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
+                        <!-- Ghost Icon -->
+                        <Path Data="{StaticResource IconShield}" Width="12" Height="12" 
+                              Stroke="#2277BB" StrokeThickness="1.5" Fill="#38BDF8" Stretch="Uniform" Margin="0,0,6,0"/>
+                        <TextBlock x:Name="TxtTitle" Text="GhostNote" FontSize="11.5" FontWeight="SemiBold" 
+                                   Foreground="#99000000" TextTrimming="CharacterEllipsis" MaxWidth="220"/>
+                    </StackPanel>
+                    
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,4,0">
+                        <!-- Edit in Manager button -->
+                        <Button Width="22" Height="22" Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                Click="OnEditClicked" ToolTip="Edit in Manager (Double-click note)">
+                            <Path Data="{StaticResource IconEdit}" Width="11" Height="11" Stroke="#88000000" StrokeThickness="1.5" Stretch="Uniform"/>
+                        </Button>
+                        <!-- Close / Hide button -->
+                        <Button x:Name="BtnClose" Width="22" Height="22" Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                Click="OnCloseClicked" ToolTip="Close / Undeploy Note">
+                            <Path Data="{StaticResource IconClose}" Width="11" Height="11" Stroke="#88000000" StrokeThickness="1.6" Stretch="Uniform"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Rendered Markdown Content Viewer -->
+                <FlowDocumentScrollViewer x:Name="Viewer" Grid.Row="1"
+                                          VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          Background="Transparent"
+                                          BorderThickness="0"
+                                          MouseDoubleClick="OnViewerDoubleClick"/>
             </Grid>
         </Border>
+
+        <!-- 8-Direction Resize Grips -->
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="8"/>

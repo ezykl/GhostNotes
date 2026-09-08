@@ -8,5 +8,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>GhostNotes</AssemblyName>
     <RootNamespace>GhostNotes</RootNamespace>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <ApplicationIcon>Assets\GhostNotes.ico</ApplicationIcon>
   </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Assets\GhostNotes.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Markdig" Version="1.3.2" />
+  </ItemGroup>
 </Project>

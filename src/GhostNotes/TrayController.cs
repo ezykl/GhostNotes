@@ -1,6 +1,6 @@
 using System;
 using System.Drawing;
-using System.Drawing.Drawing2D;
+using System.IO;
 using System.Windows.Forms;
 using GhostNotes.Interop;
 using GhostNotes.Services;
@@ -11,19 +11,24 @@ namespace GhostNotes;
 public sealed class TrayController : IDisposable
 {
     private readonly NoteManager _manager;
+    private readonly Action _openManager;
     private readonly NotifyIcon _icon;
     private bool _disposed;
 
-    public TrayController(NoteManager manager, HotkeyService hotkeys, CaptureGuard guard)
+    public TrayController(NoteManager manager, HotkeyService hotkeys, CaptureGuard guard, Action? openManager = null)
     {
         _manager = manager;
+        _openManager = openManager ?? (() => { });
+
         _icon = new NotifyIcon
         {
             Icon = BuildIcon(),
-            Text = "GhostNotes",
+            Text = "GhostNotes — Protected",
             Visible = true,
             ContextMenuStrip = BuildMenu()
         };
+
+        _icon.DoubleClick += (_, _) => _openManager();
         hotkeys.HotkeyNotice += (_, message) => ShowWarning(message);
         guard.ProtectionStatusChanged += (_, on) => UpdateTooltip(on);
         UpdateTooltip(guard.IsProtected);
@@ -31,24 +36,36 @@ public sealed class TrayController : IDisposable
 
     private static Icon BuildIcon()
     {
-        using var bmp = new Bitmap(16, 16);
-        using (var g = Graphics.FromImage(bmp))
+        try
         {
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.Clear(Color.Transparent);
-            using var brush = new SolidBrush(Color.FromArgb(255, 245, 157));
-            g.FillRectangle(brush, 1, 1, 13, 13);
-            using var pen = new Pen(Color.FromArgb(90, 70, 0), 2);
-            g.DrawRectangle(pen, 1, 1, 13, 13);
+            // Check local Assets directory
+            var appDir = AppDomain.CurrentDomain.BaseDirectory;
+            var path = Path.Combine(appDir, "Assets", "GhostNotes.ico");
+            if (File.Exists(path))
+            {
+                return new Icon(path, 32, 32);
+            }
+
+            // Or render on the fly from IconBuilder vector geometry
+            using var bmp = IconBuilder.RenderGhostLogo(32);
+            return Icon.FromHandle(bmp.GetHicon());
         }
-        return Icon.FromHandle(bmp.GetHicon());
+        catch
+        {
+            return SystemIcons.Application;
+        }
     }
 
     private ContextMenuStrip BuildMenu()
     {
         var menu = new ContextMenuStrip();
-        menu.Items.Add(new ToolStripMenuItem("New Note", null, (_, _) => _manager.CreateNote()));
-        menu.Items.Add(new ToolStripMenuItem("Show/Hide All Notes", null, (_, _) => _manager.ToggleVisibility()));
+        var openItem = new ToolStripMenuItem("Open Manager", null, (_, _) => _openManager());
+        openItem.Font = new Font(openItem.Font, FontStyle.Bold);
+        menu.Items.Add(openItem);
+
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add(new ToolStripMenuItem("New Note (Ctrl+Alt+N)", null, (_, _) => _manager.CreateNote()));
+        menu.Items.Add(new ToolStripMenuItem("Show / Hide Overlays (Ctrl+Alt+S)", null, (_, _) => _manager.ToggleVisibility()));
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("Exit", null, (_, _) => Application.Current.Shutdown()));
         return menu;
@@ -57,7 +74,7 @@ public sealed class TrayController : IDisposable
     public void UpdateTooltip(bool protectionOn)
     {
         _icon.Text =
-            $"GhostNotes — {_manager.Windows.Count} notes — Capture protection: {(protectionOn ? "ON" : "OFF")}";
+            $"GhostNotes — {_manager.Windows.Count} notes — OBS Protection: {(protectionOn ? "ON" : "OFF")}";
     }
 
     public void ShowWarning(string message) =>

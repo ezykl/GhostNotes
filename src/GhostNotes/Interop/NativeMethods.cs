@@ -55,6 +55,10 @@ public static class NativeMethods
     [DllImport("kernel32.dll")]
     public static extern uint GetCurrentProcessId();
 
+    [DllImport("kernel32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool AllocConsole();
+
     [StructLayout(LayoutKind.Sequential)]
     public struct AccentPolicy
     {

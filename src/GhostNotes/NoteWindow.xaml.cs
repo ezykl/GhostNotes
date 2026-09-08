@@ -1,22 +1,17 @@
 using System;
-using System.IO;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using GhostNotes.Interop;
 using GhostNotes.Models;
 using GhostNotes.Services;
-using Brush = System.Windows.Media.Brush;
 using Color = System.Windows.Media.Color;
 using ColorConverter = System.Windows.Media.ColorConverter;
 using ContextMenu = System.Windows.Controls.ContextMenu;
-using DataFormats = System.Windows.DataFormats;
 using MenuItem = System.Windows.Controls.MenuItem;
 using Orientation = System.Windows.Controls.Orientation;
 
@@ -26,41 +21,46 @@ public partial class NoteWindow : Window
 {
     private readonly CaptureGuard _guard;
     private IntPtr _accentPtr = IntPtr.Zero;
-    private bool _suppressTextEvents;
 
     public Note Model { get; }
 
     public event EventHandler? ModelChanged;
     public event EventHandler? GeometryChanged;
     public event EventHandler? DeleteRequested;
-    public event EventHandler? NewNoteRequested;
+    public event EventHandler? EditRequested;
 
     public NoteWindow(Note note, CaptureGuard guard)
     {
         Model = note;
         _guard = guard;
         InitializeComponent();
+
         Left = note.X;
         Top = note.Y;
         Width = note.Width;
         Height = note.Height;
-        Body.FontSize = Math.Clamp(note.FontSize, FontZoom.Min, FontZoom.Max);
-        LoadRtf(note.Rtf);
+
+        RefreshContent();
         ApplyGlassBackground();
+
         LocationChanged += (_, _) => SyncGeometry();
         SizeChanged += (_, _) => SyncGeometry();
         SourceInitialized += OnSourceInitialized;
         PreviewMouseWheel += OnPreviewMouseWheel;
         ContextMenu = BuildContextMenu();
-        Body.ContextMenu = null;
     }
 
     private void OnSourceInitialized(object? sender, EventArgs e)
     {
         var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero) return;
+
+        // Hide from Alt-Tab & Taskbar for sleek overlay behavior
         long ex = NativeMethods.GetWindowLongPtr(hwnd, NativeMethods.GWL_EXSTYLE);
         NativeMethods.SetWindowLongPtr(hwnd, NativeMethods.GWL_EXSTYLE,
             ex | NativeMethods.WS_EX_TOOLWINDOW);
+
+        // Re-enable capture protection (WDA_EXCLUDEFROMCAPTURE) for true OBS invisibility
         _guard.ApplyToWindow(hwnd);
         TryAcrylic(hwnd);
     }
@@ -70,6 +70,18 @@ public partial class NoteWindow : Window
         var hwnd = new WindowInteropHelper(this).Handle;
         if (hwnd != IntPtr.Zero) _guard.ApplyToWindow(hwnd);
         Show();
+    }
+
+    public void RefreshContent()
+    {
+        TxtTitle.Text = Model.Title;
+        Title = Model.Title;
+        
+        var content = !string.IsNullOrWhiteSpace(Model.Markdown)
+            ? Model.Markdown
+            : (!string.IsNullOrWhiteSpace(Model.Rtf) && !Model.Rtf.StartsWith("{\\rtf") ? Model.Rtf : "# Welcome to GhostNotes\n\n- Hidden from OBS & screen sharing\n- Edit notes in the Manager\n- Drag top bar to move\n- Resize from any edge");
+
+        Viewer.Document = MarkdownRenderer.Render(content, Model.FontSize);
     }
 
     private void SyncGeometry()
@@ -87,24 +99,25 @@ public partial class NoteWindow : Window
         if (e.ButtonState == MouseButtonState.Pressed) DragMove();
     }
 
+    private void OnViewerDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        EditRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OnEditClicked(object sender, RoutedEventArgs e)
+    {
+        EditRequested?.Invoke(this, EventArgs.Empty);
+    }
+
     private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
         bool ctrl = Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl);
         if (!ctrl) return;
         e.Handled = true;
-        int next = FontZoom.Clamp((int)Body.FontSize, e.Delta > 0 ? 1 : -1);
-        if (next == (int)Body.FontSize) return;
-        Body.FontSize = next;
+        int next = FontZoom.Clamp((int)Model.FontSize, e.Delta > 0 ? 1 : -1);
+        if (next == Model.FontSize) return;
         Model.FontSize = next;
-        Body.Selection.ApplyPropertyValue(TextElement.FontSizeProperty, (double)next);
-        Model.Rtf = SaveRtf();
-        ModelChanged?.Invoke(this, EventArgs.Empty);
-    }
-
-    private void OnBodyTextChanged(object? sender, TextChangedEventArgs e)
-    {
-        if (_suppressTextEvents) return;
-        Model.Rtf = SaveRtf();
+        RefreshContent();
         ModelChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -130,39 +143,46 @@ public partial class NoteWindow : Window
         Height = h;
     }
 
-    private void ApplyGlassBackground()
+    private void OnCloseClicked(object sender, RoutedEventArgs e) =>
+        DeleteRequested?.Invoke(this, EventArgs.Empty);
+
+    public void ApplyGlassBackground()
     {
         var color = (Color)ColorConverter.ConvertFromString(Model.Tint);
-        byte alpha = (byte)Math.Round(Model.Opacity * 255);
+        byte alpha = (byte)Math.Clamp(Math.Round(Model.Opacity * 255), 160, 255);
         Glass.Background = new SolidColorBrush(Color.FromArgb(alpha, color.R, color.G, color.B));
     }
 
     private void TryAcrylic(IntPtr hwnd)
     {
-        if (_accentPtr != IntPtr.Zero)
+        try
         {
-            Marshal.FreeHGlobal(_accentPtr);
-            _accentPtr = IntPtr.Zero;
+            if (_accentPtr != IntPtr.Zero)
+            {
+                Marshal.FreeHGlobal(_accentPtr);
+                _accentPtr = IntPtr.Zero;
+            }
+            int size = Marshal.SizeOf(typeof(NativeMethods.AccentPolicy));
+            var accent = new NativeMethods.AccentPolicy
+            {
+                AccentState = NativeMethods.ACCENT_ENABLE_ACRYLICBLURBEHIND,
+                GradientColor = TintToAbgr(Model.Tint, 0x66)
+            };
+            _accentPtr = Marshal.AllocHGlobal(size);
+            Marshal.StructureToPtr(accent, _accentPtr, false);
+            var data = new NativeMethods.WindowCompositionAttributeData
+            {
+                Attribute = NativeMethods.WCA_ACCENT_POLICY,
+                Data = _accentPtr,
+                SizeOfData = size
+            };
+            if (NativeMethods.SetWindowCompositionAttribute(hwnd, ref data) != 0)
+            {
+                Marshal.FreeHGlobal(_accentPtr);
+                _accentPtr = IntPtr.Zero;
+            }
         }
-        int size = Marshal.SizeOf(typeof(NativeMethods.AccentPolicy));
-        var accent = new NativeMethods.AccentPolicy
-        {
-            AccentState = NativeMethods.ACCENT_ENABLE_ACRYLICBLURBEHIND,
-            GradientColor = TintToAbgr(Model.Tint, 0x66)
-        };
-        _accentPtr = Marshal.AllocHGlobal(size);
-        Marshal.StructureToPtr(accent, _accentPtr, false);
-        var data = new NativeMethods.WindowCompositionAttributeData
-        {
-            Attribute = NativeMethods.WCA_ACCENT_POLICY,
-            Data = _accentPtr,
-            SizeOfData = size
-        };
-        if (NativeMethods.SetWindowCompositionAttribute(hwnd, ref data) != 0)
-        {
-            Marshal.FreeHGlobal(_accentPtr);
-            _accentPtr = IntPtr.Zero;
-        }
+        catch { }
     }
 
     private static uint TintToAbgr(string hex, byte alpha)
@@ -171,98 +191,19 @@ public partial class NoteWindow : Window
         return (uint)((alpha << 24) | (c.B << 16) | (c.G << 8) | c.R);
     }
 
-    private void LoadRtf(string rtf)
-    {
-        _suppressTextEvents = true;
-        try
-        {
-            var range = new TextRange(Body.Document.ContentStart, Body.Document.ContentEnd);
-            if (string.IsNullOrEmpty(rtf))
-            {
-                range.Text = "";
-            }
-            else
-            {
-                using var ms = new MemoryStream(Encoding.Default.GetBytes(rtf));
-                range.Load(ms, DataFormats.Rtf);
-            }
-        }
-        catch (ArgumentException)
-        {
-            var range = new TextRange(Body.Document.ContentStart, Body.Document.ContentEnd);
-            range.Text = "";
-        }
-        finally
-        {
-            _suppressTextEvents = false;
-        }
-    }
-
-    private string SaveRtf()
-    {
-        var range = new TextRange(Body.Document.ContentStart, Body.Document.ContentEnd);
-        using var ms = new MemoryStream();
-        range.Save(ms, DataFormats.Rtf);
-        return Encoding.Default.GetString(ms.ToArray());
-    }
-
-    private void OnToggleBold(object sender, RoutedEventArgs e) =>
-        EditingCommands.ToggleBold.Execute(null, Body);
-
-    private void OnToggleItalic(object sender, RoutedEventArgs e) =>
-        EditingCommands.ToggleItalic.Execute(null, Body);
-
-    private void OnToggleUnderline(object sender, RoutedEventArgs e) =>
-        EditingCommands.ToggleUnderline.Execute(null, Body);
-
-    private void OnTextColorSelected(object sender, SelectionChangedEventArgs e)
-    {
-        if (Model is null || Body is null || TextColors is null) return;
-        if (TextColors.SelectedItem is ComboBoxItem item && item.Tag is string hex)
-        {
-            Body.Selection.ApplyPropertyValue(TextElement.ForegroundProperty, BrushFrom(hex));
-            Model.Rtf = SaveRtf();
-            ModelChanged?.Invoke(this, EventArgs.Empty);
-        }
-    }
-
-    private void OnTintSelected(object sender, SelectionChangedEventArgs e)
-    {
-        if (Model is null || Glass is null || Tints is null) return;
-        if (Tints.SelectedItem is ComboBoxItem item && item.Tag is string hex)
-        {
-            Model.Tint = hex;
-            ApplyGlassBackground();
-            RefreshAcrylic();
-            ModelChanged?.Invoke(this, EventArgs.Empty);
-        }
-    }
-
-    private void RefreshAcrylic()
-    {
-        var hwnd = new WindowInteropHelper(this).Handle;
-        if (hwnd != IntPtr.Zero) TryAcrylic(hwnd);
-    }
-
-    private static Brush BrushFrom(string hex)
-    {
-        var color = (Color)ColorConverter.ConvertFromString(hex);
-        var brush = new SolidColorBrush(color);
-        brush.Freeze();
-        return brush;
-    }
-
     private ContextMenu BuildContextMenu()
     {
         var menu = new ContextMenu();
 
-        var newNote = new MenuItem { Header = "New Note" };
-        newNote.Click += (_, _) => NewNoteRequested?.Invoke(this, EventArgs.Empty);
-        menu.Items.Add(newNote);
+        var edit = new MenuItem { Header = "Edit in Manager (Double-Click)" };
+        edit.Click += (_, _) => EditRequested?.Invoke(this, EventArgs.Empty);
+        menu.Items.Add(edit);
 
-        var delete = new MenuItem { Header = "Delete Note" };
+        var delete = new MenuItem { Header = "Close Note" };
         delete.Click += (_, _) => DeleteRequested?.Invoke(this, EventArgs.Empty);
         menu.Items.Add(delete);
+
+        menu.Items.Add(new Separator());
 
         var opacityItem = new MenuItem { StaysOpenOnClick = true };
         var panel = new StackPanel { Orientation = Orientation.Horizontal };
@@ -281,10 +222,8 @@ public partial class NoteWindow : Window
         var resetFont = new MenuItem { Header = "Reset Font Size" };
         resetFont.Click += (_, _) =>
         {
-            Body.FontSize = 14;
             Model.FontSize = 14;
-            Body.Selection.ApplyPropertyValue(TextElement.FontSizeProperty, 14.0);
-            Model.Rtf = SaveRtf();
+            RefreshContent();
             ModelChanged?.Invoke(this, EventArgs.Empty);
         };
         menu.Items.Add(resetFont);
