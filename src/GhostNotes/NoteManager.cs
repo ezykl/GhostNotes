@@ -18,7 +18,25 @@ public sealed class NoteManager : IDisposable
     private readonly List<NoteWindow> _windows = new();
     private readonly List<Note> _notes = new();
     private readonly Dictionary<string, AutosaveScheduler> _schedulers = new();
+    public static readonly string[] ColorPalette =
+    {
+        "#BBDEFB", // Sky Blue
+        "#C8E6C9", // Mint Green
+        "#F8BBD0", // Pastel Pink
+        "#D1C4E9", // Lavender
+        "#FFFFFF", // White
+        "#FFF59D"  // Soft Yellow (displayed after others, completing the cycle)
+    };
+
+    private int _colorIndex = 0;
     private Point _nextCascade = new(100, 100);
+
+    public string GetNextTint()
+    {
+        var tint = ColorPalette[Math.Abs(_colorIndex) % ColorPalette.Length];
+        _colorIndex++;
+        return tint;
+    }
 
     public IReadOnlyList<NoteWindow> Windows => _windows;
     public IReadOnlyList<Note> Notes => _notes;
@@ -47,6 +65,7 @@ public sealed class NoteManager : IDisposable
         _notes.Clear();
         var loaded = _repo.LoadAll().ToList();
         _notes.AddRange(loaded);
+        _colorIndex = _notes.Count;
 
         int restoredCount = 0;
         foreach (var note in _notes)
@@ -111,6 +130,7 @@ public sealed class NoteManager : IDisposable
             Width = 320,
             Height = 220,
             Markdown = "",
+            Tint = GetNextTint(),
             IsClosed = false,
             IsMinimized = false
         };
@@ -232,8 +252,22 @@ public sealed class NoteManager : IDisposable
     private static (double X, double Y, double W, double H)[] ScreenRects()
     {
         var list = new List<(double, double, double, double)>();
+        double dpiX = 1.0, dpiY = 1.0;
+        try
+        {
+            var primary = System.Windows.Forms.Screen.PrimaryScreen;
+            if (primary != null && primary.WorkingArea.Width > 0 && SystemParameters.WorkArea.Width > 0)
+            {
+                dpiX = primary.WorkingArea.Width / SystemParameters.WorkArea.Width;
+                dpiY = primary.WorkingArea.Height / SystemParameters.WorkArea.Height;
+                if (dpiX <= 0) dpiX = 1.0;
+                if (dpiY <= 0) dpiY = 1.0;
+            }
+        }
+        catch { }
+
         foreach (var s in System.Windows.Forms.Screen.AllScreens)
-            list.Add((s.WorkingArea.X, s.WorkingArea.Y, s.WorkingArea.Width, s.WorkingArea.Height));
+            list.Add((s.WorkingArea.X / dpiX, s.WorkingArea.Y / dpiY, s.WorkingArea.Width / dpiX, s.WorkingArea.Height / dpiY));
         return list.ToArray();
     }
 }

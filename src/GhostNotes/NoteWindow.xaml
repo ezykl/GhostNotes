@@ -202,7 +202,8 @@
                                  AcceptsTab="True"
                                  VerticalScrollBarVisibility="Auto"
                                  HorizontalScrollBarVisibility="Disabled"
-                                 TextChanged="OnEditorTextChanged"/>
+                                 TextChanged="OnEditorTextChanged"
+                                 PreviewMouseLeftButtonDown="OnEditorPreviewMouseLeftButtonDown"/>
 
                     <!-- Bottom Hover Toolbar Trigger Area & Floating Capsule -->
                     <Border x:Name="BottomHoverArea" VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Height="36"
