@@ -18,6 +18,7 @@ using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
 using MouseButtonEventArgs = System.Windows.Input.MouseButtonEventArgs;
 using Brushes = System.Windows.Media.Brushes;
+using DataFormats = System.Windows.DataFormats;
 
 namespace GhostNotes;
 
@@ -109,11 +110,26 @@ public partial class NoteWindow : Window
         try
         {
             var range = new TextRange(EditorBox.Document.ContentStart, EditorBox.Document.ContentEnd);
-            var text = !string.IsNullOrWhiteSpace(Model.Markdown)
-                ? Model.Markdown
-                : (!string.IsNullOrWhiteSpace(Model.Rtf) && !Model.Rtf.StartsWith("{\\rtf") ? Model.Rtf : "");
 
-            range.Text = text ?? "";
+            if (!string.IsNullOrWhiteSpace(Model.Rtf) && Model.Rtf.TrimStart().StartsWith("{\\rtf"))
+            {
+                try
+                {
+                    using var ms = new MemoryStream(Encoding.UTF8.GetBytes(Model.Rtf));
+                    range.Load(ms, DataFormats.Rtf);
+                }
+                catch
+                {
+                    range.Text = !string.IsNullOrWhiteSpace(Model.Markdown) ? Model.Markdown : Model.Rtf;
+                }
+            }
+            else
+            {
+                var text = !string.IsNullOrWhiteSpace(Model.Markdown)
+                    ? Model.Markdown
+                    : (!string.IsNullOrWhiteSpace(Model.Rtf) ? Model.Rtf : "");
+                range.Text = text ?? "";
+            }
 
             EditorBox.FontSize = Math.Clamp(Model.FontSize, 10, 28);
             TxtTitle.Text = Model.Title;
@@ -128,13 +144,65 @@ public partial class NoteWindow : Window
     {
         if (_suppressTextEvents || Model is null) return;
 
-        var range = new TextRange(EditorBox.Document.ContentStart, EditorBox.Document.ContentEnd);
-        var text = range.Text.TrimEnd();
-        Model.Markdown = text;
-        Model.Rtf = text;
-        TxtTitle.Text = Model.Title;
-
+        FlushEditorToModel();
         ModelChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OnEditorPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        var point = e.GetPosition(EditorBox);
+        var pointer = EditorBox.GetPositionFromPoint(point, snapToText: true);
+        if (pointer?.Paragraph is not { } para) return;
+
+        var startRange = new TextRange(para.ContentStart, pointer);
+        int clickOffset = startRange.Text.Length;
+
+        // Only toggle if clicked near the checkbox indicator at line start
+        if (clickOffset > 8) return;
+
+        foreach (var inline in para.Inlines)
+        {
+            if (inline is Run r)
+            {
+                var rText = r.Text;
+                int prefixIndex = rText.IndexOf("[ ]", StringComparison.Ordinal);
+                if (prefixIndex >= 0 && prefixIndex <= 4)
+                {
+                    _suppressTextEvents = true;
+                    try
+                    {
+                        r.Text = rText.Substring(0, prefixIndex) + "[x]" + rText.Substring(prefixIndex + 3);
+                        new TextRange(para.ContentStart, para.ContentEnd)
+                            .ApplyPropertyValue(Inline.TextDecorationsProperty, TextDecorations.Strikethrough);
+                    }
+                    finally { _suppressTextEvents = false; }
+
+                    FlushEditorToModel();
+                    ModelChanged?.Invoke(this, EventArgs.Empty);
+                    e.Handled = true;
+                    return;
+                }
+
+                int checkedIndex = rText.IndexOf("[x]", StringComparison.OrdinalIgnoreCase);
+                if (checkedIndex >= 0 && checkedIndex <= 4)
+                {
+                    _suppressTextEvents = true;
+                    try
+                    {
+                        r.Text = rText.Substring(0, checkedIndex) + "[ ]" + rText.Substring(checkedIndex + 3);
+                        new TextRange(para.ContentStart, para.ContentEnd)
+                            .ApplyPropertyValue(Inline.TextDecorationsProperty, null);
+                    }
+                    finally { _suppressTextEvents = false; }
+
+                    FlushEditorToModel();
+                    ModelChanged?.Invoke(this, EventArgs.Empty);
+                    e.Handled = true;
+                    return;
+                }
+                break;
+            }
+        }
     }
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
@@ -242,16 +310,43 @@ public partial class NoteWindow : Window
         SetMinimized(false);
     }
 
+    private (double DpiX, double DpiY) GetDpiScale()
+    {
+        try
+        {
+            var dpi = VisualTreeHelper.GetDpi(this);
+            return (dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1.0, dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0);
+        }
+        catch
+        {
+            return (1.0, 1.0);
+        }
+    }
+
+    private (double Left, double Top, double Right, double Bottom, double Width, double Height) GetActiveMonitorBoundsDip()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        var screen = hwnd != IntPtr.Zero
+            ? System.Windows.Forms.Screen.FromHandle(hwnd)
+            : System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)Left, (int)Top));
+
+        var (dpiX, dpiY) = GetDpiScale();
+        var b = screen.WorkingArea;
+        return (
+            b.Left / dpiX,
+            b.Top / dpiY,
+            b.Right / dpiX,
+            b.Bottom / dpiY,
+            b.Width / dpiX,
+            b.Height / dpiY
+        );
+    }
+
     private void SnapToNearestEdge()
     {
         try
         {
-            var hwnd = new WindowInteropHelper(this).Handle;
-            var screen = hwnd != IntPtr.Zero
-                ? System.Windows.Forms.Screen.FromHandle(hwnd)
-                : System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)Left, (int)Top));
-
-            var bounds = screen.WorkingArea;
+            var bounds = GetActiveMonitorBoundsDip();
 
             if (Math.Abs(Left - bounds.Left) < 50)
             {
@@ -281,12 +376,7 @@ public partial class NoteWindow : Window
     {
         try
         {
-            var hwnd = new WindowInteropHelper(this).Handle;
-            var screen = hwnd != IntPtr.Zero
-                ? System.Windows.Forms.Screen.FromHandle(hwnd)
-                : System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)Left, (int)Top));
-
-            var bounds = screen.WorkingArea;
+            var bounds = GetActiveMonitorBoundsDip();
             _fullDockLeft = bounds.Right - Width - 6;
             _peekDockLeft = bounds.Right - 75;
 
@@ -301,12 +391,7 @@ public partial class NoteWindow : Window
     {
         try
         {
-            var hwnd = new WindowInteropHelper(this).Handle;
-            var screen = hwnd != IntPtr.Zero
-                ? System.Windows.Forms.Screen.FromHandle(hwnd)
-                : System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)Left, (int)Top));
-
-            var bounds = screen.WorkingArea;
+            var bounds = GetActiveMonitorBoundsDip();
             Left = Math.Clamp(Left, bounds.Left + 4, bounds.Right - Width - 4);
             Top = Math.Clamp(Top, bounds.Top + 4, bounds.Bottom - Height - 4);
         }
@@ -368,9 +453,20 @@ public partial class NoteWindow : Window
     {
         if (Model is null) return;
         var range = new TextRange(EditorBox.Document.ContentStart, EditorBox.Document.ContentEnd);
-        var text = range.Text.TrimEnd();
-        Model.Markdown = text;
-        Model.Rtf = text;
+        var plainText = range.Text.TrimEnd();
+        Model.Markdown = plainText;
+
+        try
+        {
+            using var ms = new MemoryStream();
+            range.Save(ms, DataFormats.Rtf);
+            Model.Rtf = Encoding.UTF8.GetString(ms.ToArray());
+        }
+        catch
+        {
+            Model.Rtf = plainText;
+        }
+
         TxtTitle.Text = Model.Title;
     }
 

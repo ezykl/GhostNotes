@@ -17,6 +17,7 @@ public sealed class AutosaveScheduler : IDisposable
     {
         _flush = flush;
         _delay = delay;
+        _timer = new Timer(_ => FlushOnce(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
     }
 
     public void Trigger()
@@ -25,8 +26,7 @@ public sealed class AutosaveScheduler : IDisposable
         {
             if (_disposed) return;
             _pending = true;
-            _timer?.Dispose();
-            _timer = new Timer(_ => FlushOnce(), null, _delay, Timeout.InfiniteTimeSpan);
+            _timer?.Change(_delay, Timeout.InfiniteTimeSpan);
         }
     }
 
@@ -35,8 +35,7 @@ public sealed class AutosaveScheduler : IDisposable
         lock (_sync)
         {
             if (_disposed) return;
-            _timer?.Dispose();
-            _timer = null;
+            _timer?.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         }
         FlushOnce();
     }
@@ -46,8 +45,7 @@ public sealed class AutosaveScheduler : IDisposable
         lock (_sync)
         {
             _pending = false;
-            _timer?.Dispose();
-            _timer = null;
+            _timer?.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         }
     }
 

@@ -105,7 +105,7 @@ public partial class App : Application
         // Capture protection sweep timer — ensures all sticky notes, pills, and popups stay invisible to OBS
         var sweep = new System.Windows.Threading.DispatcherTimer
         {
-            Interval = TimeSpan.FromSeconds(1)
+            Interval = TimeSpan.FromSeconds(5)
         };
         sweep.Tick += (_, _) => _captureGuard.Sweep();
         sweep.Start();

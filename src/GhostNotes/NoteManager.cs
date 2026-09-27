@@ -232,8 +232,22 @@ public sealed class NoteManager : IDisposable
     private static (double X, double Y, double W, double H)[] ScreenRects()
     {
         var list = new List<(double, double, double, double)>();
+        double dpiX = 1.0, dpiY = 1.0;
+        try
+        {
+            var primary = System.Windows.Forms.Screen.PrimaryScreen;
+            if (primary != null && primary.WorkingArea.Width > 0 && SystemParameters.WorkArea.Width > 0)
+            {
+                dpiX = primary.WorkingArea.Width / SystemParameters.WorkArea.Width;
+                dpiY = primary.WorkingArea.Height / SystemParameters.WorkArea.Height;
+                if (dpiX <= 0) dpiX = 1.0;
+                if (dpiY <= 0) dpiY = 1.0;
+            }
+        }
+        catch { }
+
         foreach (var s in System.Windows.Forms.Screen.AllScreens)
-            list.Add((s.WorkingArea.X, s.WorkingArea.Y, s.WorkingArea.Width, s.WorkingArea.Height));
+            list.Add((s.WorkingArea.X / dpiX, s.WorkingArea.Y / dpiY, s.WorkingArea.Width / dpiX, s.WorkingArea.Height / dpiY));
         return list.ToArray();
     }
 }

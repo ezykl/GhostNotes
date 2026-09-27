@@ -53,7 +53,11 @@ public sealed class NoteRepository
     {
         note.UpdatedAt = DateTime.UtcNow;
         Directory.CreateDirectory(_directory);
-        File.WriteAllText(PathFor(note.Id), JsonSerializer.Serialize(note, JsonOpts));
+        var targetPath = PathFor(note.Id);
+        var tempPath = targetPath + ".tmp." + Guid.NewGuid().ToString("N");
+        var json = JsonSerializer.Serialize(note, JsonOpts);
+        File.WriteAllText(tempPath, json);
+        File.Move(tempPath, targetPath, overwrite: true);
     }
 
     public void Delete(string id)
