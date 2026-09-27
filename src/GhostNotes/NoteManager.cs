@@ -18,7 +18,25 @@ public sealed class NoteManager : IDisposable
     private readonly List<NoteWindow> _windows = new();
     private readonly List<Note> _notes = new();
     private readonly Dictionary<string, AutosaveScheduler> _schedulers = new();
+    public static readonly string[] ColorPalette =
+    {
+        "#BBDEFB", // Sky Blue
+        "#C8E6C9", // Mint Green
+        "#F8BBD0", // Pastel Pink
+        "#D1C4E9", // Lavender
+        "#FFFFFF", // White
+        "#FFF59D"  // Soft Yellow (displayed after others, completing the cycle)
+    };
+
+    private int _colorIndex = 0;
     private Point _nextCascade = new(100, 100);
+
+    public string GetNextTint()
+    {
+        var tint = ColorPalette[Math.Abs(_colorIndex) % ColorPalette.Length];
+        _colorIndex++;
+        return tint;
+    }
 
     public IReadOnlyList<NoteWindow> Windows => _windows;
     public IReadOnlyList<Note> Notes => _notes;
@@ -47,6 +65,7 @@ public sealed class NoteManager : IDisposable
         _notes.Clear();
         var loaded = _repo.LoadAll().ToList();
         _notes.AddRange(loaded);
+        _colorIndex = _notes.Count;
 
         int restoredCount = 0;
         foreach (var note in _notes)
@@ -111,6 +130,7 @@ public sealed class NoteManager : IDisposable
             Width = 320,
             Height = 220,
             Markdown = "",
+            Tint = GetNextTint(),
             IsClosed = false,
             IsMinimized = false
         };
