@@ -31,8 +31,16 @@ public sealed class NoteManager : IDisposable
     private int _colorIndex = 0;
     private Point _nextCascade = new(100, 100);
 
-    public string GetNextTint()
+    public string GetNextTint(string? currentTint = null)
     {
+        if (!string.IsNullOrEmpty(currentTint))
+        {
+            int idx = Array.FindIndex(ColorPalette, c => string.Equals(c, currentTint, StringComparison.OrdinalIgnoreCase));
+            if (idx >= 0)
+            {
+                _colorIndex = idx + 1;
+            }
+        }
         var tint = ColorPalette[Math.Abs(_colorIndex) % ColorPalette.Length];
         _colorIndex++;
         return tint;
@@ -121,7 +129,7 @@ public sealed class NoteManager : IDisposable
         return !nonTemplateLines.Any();
     }
 
-    public NoteWindow CreateNote()
+    public NoteWindow CreateNote(string? basedOnTint = null)
     {
         var note = new Note
         {
@@ -130,7 +138,7 @@ public sealed class NoteManager : IDisposable
             Width = 320,
             Height = 220,
             Markdown = "",
-            Tint = GetNextTint(),
+            Tint = GetNextTint(basedOnTint),
             IsClosed = false,
             IsMinimized = false
         };
@@ -233,7 +241,7 @@ public sealed class NoteManager : IDisposable
         window.GeometryChanged += (_, _) => OnNoteModelChanged(window.Model);
         window.CloseRequested += (_, _) => CloseNote(window);
         window.PermanentDeleteRequested += (_, _) => PermanentlyDeleteNote(window);
-        window.NewNoteRequested += (_, _) => CreateNote();
+        window.NewNoteRequested += (_, _) => CreateNote(window.Model.Tint);
         window.Show();
         return window;
     }

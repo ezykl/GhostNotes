@@ -50,4 +50,25 @@ public sealed class ColorPaletteTests
         var seventh = manager.GetNextTint();
         Assert.Equal("#BBDEFB", seventh);
     }
+
+    [Fact]
+    public void GetNextTint_BasedOnYellow_ReturnsAlternateSkyBlue()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "test_pal_" + Guid.NewGuid().ToString("N"));
+        var repo = new NoteRepository(dir);
+        var guard = new CaptureGuard(
+            new NativeAffinityApi(),
+            new ProcessWindowEnumerator(),
+            new VersionGate(26200),
+            123);
+        var manager = new NoteManager(repo, guard);
+
+        // When based on Yellow, next should alternate to Sky Blue
+        var nextFromYellow = manager.GetNextTint("#FFF59D");
+        Assert.Equal("#BBDEFB", nextFromYellow);
+
+        // Next from Sky Blue should be Mint Green
+        var nextFromSky = manager.GetNextTint("#BBDEFB");
+        Assert.Equal("#C8E6C9", nextFromSky);
+    }
 }

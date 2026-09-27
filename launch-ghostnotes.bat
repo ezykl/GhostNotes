@@ -2,8 +2,14 @@
 echo Stopping any running GhostNotes instances...
 taskkill /IM GhostNotes.exe /F >nul 2>&1
 timeout /t 1 /nobreak >nul
-echo Launching GhostNotes...
-start "" "%~dp0publish-folder\GhostNotes.exe"
+echo Launching latest GhostNotes...
+if exist "%~dp0src\GhostNotes\bin\Debug\net8.0-windows\GhostNotes.exe" (
+    start "" "%~dp0src\GhostNotes\bin\Debug\net8.0-windows\GhostNotes.exe"
+) else if exist "%~dp0publish\GhostNotes.exe" (
+    start "" "%~dp0publish\GhostNotes.exe"
+) else (
+    start "" "%~dp0publish-folder\GhostNotes.exe"
+)
 echo GhostNotes launched. Waiting 3 seconds...
 timeout /t 3 /nobreak >nul
 echo.
